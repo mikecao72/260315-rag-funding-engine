@@ -1,0 +1,39 @@
+[
+  {
+    "id": "hand_laceration_6cm_foreign_body",
+    "input": {
+      "consult_text": "32-year-old male construction worker. Injury occurred at workplace (ACC claim). No Community Services Card. Arrived at urgent care clinic at 14:20. 6 cm laceration across dorsum of left hand extending onto proximal index finger. Local anaesthetic administered and wound irrigated extensively. Debridement of contaminated tissue. Primary closure with 7 interrupted sutures. Dressing applied. Embedded metal fragment removed from wound during exploration.",
+      "top_n": 3
+    },
+    "expected": {
+      "must_include_codes": ["GP1", "MW2", "MM5"],
+      "top_code": "MW2",
+      "expected_total_excl_gst": 140.63,
+      "total_tolerance": 0.02
+    }
+  },
+  {
+    "id": "distal_radius_ulna_fracture_no_reduction",
+    "input": {
+      "consult_text": "47-year-old female office manager. Presents to urgent care clinic at 10:35 (in hours). ACC injury from accidental fall at home. No Community Services Card. X-ray confirmed closed distal radius and ulna fracture without need for reduction. Wrist/forearm immobilised in cast.",
+      "top_n": 2
+    },
+    "expected": {
+      "must_include_codes": ["GP1", "MF9"],
+      "expected_total_excl_gst": 161.94,
+      "total_tolerance": 0.02
+    }
+  },
+  {
+    "id": "distal_tibia_fibula_reduction_with_scalp_laceration",
+    "input": {
+      "consult_text": "29-year-old male software engineer. Presented to urgent care clinic at 18:05 (in hours). ACC injury from e-scooter fall. No Community Services Card. 1.5 cm laceration over right frontal scalp near hairline. head wound cleaned, explored, and closed. dressing applied. Imaging confirmed closed distal tibia and fibula fracture requiring reduction. Fracture reduced and immobilised in cast.",
+      "top_n": 3
+    },
+    "expected": {
+      "must_include_codes": ["GP1", "MF15", "MW1"],
+      "expected_total_excl_gst": 234.54,
+      "total_tolerance": 0.02
+    }
+  }
+]

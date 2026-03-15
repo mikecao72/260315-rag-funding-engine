@@ -1,0 +1,513 @@
+[
+  {
+    "code": "ACC",
+    "description": "Information sheet This information sheet lists the Cost of Treatment Regulations amounts ACC can pay for medical practitioner, nurse and paramedic treatments. unit $ (excl. GST) Per unit $ (incl. GST) Per hour $ (excl. GST) Per hour $ (incl. GST) Flat rate $ (excl. GST) Flat rate $ (incl. GST) Nurses and nurse practitioners",
+    "fee_excl_gst": null,
+    "fee_incl_gst": null,
+    "page": 1
+  },
+  {
+    "code": "NCON",
+    "description": "Nurse consultation if the client is 14 years old or over",
+    "fee_excl_gst": 17.81,
+    "fee_incl_gst": 20.48,
+    "page": 1
+  },
+  {
+    "code": "NC14",
+    "description": "Nurse consultation if the client is under 14 years old",
+    "fee_excl_gst": 37.92,
+    "fee_incl_gst": 43.61,
+    "page": 1
+  },
+  {
+    "code": "NCCS",
+    "description": "Nurse consultation – Community Services Card holder",
+    "fee_excl_gst": 32.79,
+    "fee_incl_gst": 37.71,
+    "page": 1
+  },
+  {
+    "code": "NCCD",
+    "description": "Nurse consultation – dependant of Community Services Card holder (14 -17 years)",
+    "fee_excl_gst": 38.98,
+    "fee_incl_gst": 44.83,
+    "page": 1
+  },
+  {
+    "code": "NUP1",
+    "description": "Nurse practitioner consultation if the client is 14 years old or over",
+    "fee_excl_gst": 32.61,
+    "fee_incl_gst": 37.5,
+    "page": 1
+  },
+  {
+    "code": "NU14",
+    "description": "Nurse practitioner consultation if the client is under 14 years old",
+    "fee_excl_gst": 62.19,
+    "fee_incl_gst": 71.52,
+    "page": 1
+  },
+  {
+    "code": "NUCS",
+    "description": "Nurse practitioner consultation – Community Services Card holder",
+    "fee_excl_gst": 58.27,
+    "fee_incl_gst": 67.01,
+    "page": 1
+  },
+  {
+    "code": "NUCD",
+    "description": "Nurse practitioner consultation – Dependant of Community Services Card holder (14 – 17 years) Combined",
+    "fee_excl_gst": 63.95,
+    "fee_incl_gst": 73.54,
+    "page": 1
+  },
+  {
+    "code": "GPN",
+    "description": "Nurse/GP consultation – if the client is 14 years old or over",
+    "fee_excl_gst": 38.94,
+    "fee_incl_gst": 44.78,
+    "page": 1
+  },
+  {
+    "code": "GN14",
+    "description": "Nurse/GP consultation – if the client is under 14 years old",
+    "fee_excl_gst": 66.64,
+    "fee_incl_gst": 76.64,
+    "page": 1
+  },
+  {
+    "code": "GNCS",
+    "description": "Nurse/GP consultation – Community Services Card holder",
+    "fee_excl_gst": 62.62,
+    "fee_incl_gst": 72.01,
+    "page": 2
+  },
+  {
+    "code": "GNCD",
+    "description": "Nurse/GP consultation – dependant of Community Services Card holder (14 -17 years)",
+    "fee_excl_gst": 68.43,
+    "fee_incl_gst": 78.69,
+    "page": 2
+  },
+  {
+    "code": "NN1",
+    "description": "Nurse/Nurse Practitioner consultation – if the client is 14 years old or over",
+    "fee_excl_gst": 33.1,
+    "fee_incl_gst": 38.07,
+    "page": 2
+  },
+  {
+    "code": "NN14",
+    "description": "Nurse/Nurse Practitioner consultation – if the client under 14 years old",
+    "fee_excl_gst": 61.18,
+    "fee_incl_gst": 70.36,
+    "page": 2
+  },
+  {
+    "code": "NNCS",
+    "description": "Nurse/Nurse Practitioner consultation – Community Services Card holder",
+    "fee_excl_gst": 57.42,
+    "fee_incl_gst": 66.03,
+    "page": 2
+  },
+  {
+    "code": "NNCD",
+    "description": "Nurse/Nurse Practitioner consultation – dependant of Community Services Card holder (14 -17 years) Paramedics",
+    "fee_excl_gst": 62.87,
+    "fee_incl_gst": 72.3,
+    "page": 2
+  },
+  {
+    "code": "PM1",
+    "description": "Paramedic consultation if the client is 14 years old or over",
+    "fee_excl_gst": 16.99,
+    "fee_incl_gst": 19.54,
+    "page": 2
+  },
+  {
+    "code": "PM14",
+    "description": "Paramedic consultation if the client is under 14 years old",
+    "fee_excl_gst": 36.17,
+    "fee_incl_gst": 41.6,
+    "page": 2
+  },
+  {
+    "code": "PMCS",
+    "description": "Paramedic consultation – Community Services Card holder",
+    "fee_excl_gst": 31.27,
+    "fee_incl_gst": 35.96,
+    "page": 2
+  },
+  {
+    "code": "PMCD",
+    "description": "Paramedic consultation – dependant of Community Services Card holder (14 -17 years) Medical practitioners",
+    "fee_excl_gst": 37.18,
+    "fee_incl_gst": 42.76,
+    "page": 2
+  },
+  {
+    "code": "GP1",
+    "description": "GP consultation – if the client is 14 years old or over (also known as CON)",
+    "fee_excl_gst": 35.77,
+    "fee_incl_gst": 41.14,
+    "page": 2
+  },
+  {
+    "code": "GP14",
+    "description": "GP consultation – if the client is under 14 years old",
+    "fee_excl_gst": 63.61,
+    "fee_incl_gst": 73.15,
+    "page": 2
+  },
+  {
+    "code": "GPCS",
+    "description": "GP consultation - Community Services Card holder",
+    "fee_excl_gst": 59.57,
+    "fee_incl_gst": 68.51,
+    "page": 2
+  },
+  {
+    "code": "GPCD",
+    "description": "GP consultation – dependant of Community Services Card holder (14 -17 years)",
+    "fee_excl_gst": 65.4,
+    "fee_incl_gst": 75.21,
+    "page": 3
+  },
+  {
+    "code": "DIS",
+    "description": "GP Emergency travel per km",
+    "fee_excl_gst": 0.73,
+    "fee_incl_gst": 0.84,
+    "page": 3
+  },
+  {
+    "code": "TIME",
+    "description": "Attendance (including travel time) at an emergency Burn/Abrasion",
+    "fee_excl_gst": 49.27,
+    "fee_incl_gst": 56.66,
+    "page": 3
+  },
+  {
+    "code": "MB1",
+    "description": "Treatment of burn less than 4cm²",
+    "fee_excl_gst": 34.96,
+    "fee_incl_gst": 40.2,
+    "page": 3
+  },
+  {
+    "code": "MB2",
+    "description": "Treatment of burn at a single site greater than 4cm²",
+    "fee_excl_gst": 68.85,
+    "fee_incl_gst": 79.18,
+    "page": 3
+  },
+  {
+    "code": "MB3",
+    "description": "Treatment of significant abrasions less than 4cm² at a single site",
+    "fee_excl_gst": 34.97,
+    "fee_incl_gst": 40.22,
+    "page": 3
+  },
+  {
+    "code": "MB4",
+    "description": "Treatment of significant abrasions greater than 4cm² at a single site",
+    "fee_excl_gst": 68.85,
+    "fee_incl_gst": 79.18,
+    "page": 3
+  },
+  {
+    "code": "MB5",
+    "description": "Significant burns or abrasions (not including fractures) at multiple sites (greater than 4cm²): necessary wound cleaning, preparation, and dressing Dislocation",
+    "fee_excl_gst": 100.31,
+    "fee_incl_gst": 115.36,
+    "page": 3
+  },
+  {
+    "code": "MD1",
+    "description": "Dislocation of finger/toe with splint/strapping",
+    "fee_excl_gst": 40.51,
+    "fee_incl_gst": 46.59,
+    "page": 3
+  },
+  {
+    "code": "MD2",
+    "description": "Dislocation of thumb: closed reduction and immobilisation",
+    "fee_excl_gst": 113.51,
+    "fee_incl_gst": 130.54,
+    "page": 3
+  },
+  {
+    "code": "MD3",
+    "description": "Dislocation of elbow with radiological confirmation: closed reduction and immobilisation",
+    "fee_excl_gst": 105.14,
+    "fee_incl_gst": 120.91,
+    "page": 3
+  },
+  {
+    "code": "MD4",
+    "description": "Dislocation of shoulder: closed reduction and collar and cuff immobilisation",
+    "fee_excl_gst": 75.74,
+    "fee_incl_gst": 87.1,
+    "page": 3
+  },
+  {
+    "code": "MD5",
+    "description": "Dislocation of patella: closed reduction and cast immobilisation",
+    "fee_excl_gst": 180.19,
+    "fee_incl_gst": 207.22,
+    "page": 3
+  },
+  {
+    "code": "MF1",
+    "description": "Fractured finger or toe (proximal, middle, or distal phalanx): closed reduction and immobilisation",
+    "fee_excl_gst": 40.51,
+    "fee_incl_gst": 46.59,
+    "page": 4
+  },
+  {
+    "code": "MF2",
+    "description": "Fractured finger or toe (proximal, middle, or distal phalanx): requiring local anaesthetic",
+    "fee_excl_gst": 56.0,
+    "fee_incl_gst": 64.4,
+    "page": 4
+  },
+  {
+    "code": "MF3",
+    "description": "Fractured metatarsal: closed reduction (not requiring cast): immobilisation by strapping",
+    "fee_excl_gst": 40.51,
+    "fee_incl_gst": 46.59,
+    "page": 4
+  },
+  {
+    "code": "MF4",
+    "description": "Fractured metacarpal(s) hand: with or without local anaesthetic: immobilisation by strapping",
+    "fee_excl_gst": 56.0,
+    "fee_incl_gst": 64.4,
+    "page": 4
+  },
+  {
+    "code": "MF5",
+    "description": "Fractured carpal bone, including scaphoid: treatment by cast immobilisation, not requiring reduction",
+    "fee_excl_gst": 126.17,
+    "fee_incl_gst": 145.1,
+    "page": 4
+  },
+  {
+    "code": "MF6",
+    "description": "Fractured tarsal or metatarsal bones (excluding calcaneum or talus): treatment by cast immobilisation",
+    "fee_excl_gst": 180.19,
+    "fee_incl_gst": 207.22,
+    "page": 4
+  },
+  {
+    "code": "MF7",
+    "description": "Fractured calcaneum or talus: treatment by cast immobilisation",
+    "fee_excl_gst": 180.19,
+    "fee_incl_gst": 207.22,
+    "page": 4
+  },
+  {
+    "code": "MF8",
+    "description": "Fractured clavicle",
+    "fee_excl_gst": 75.74,
+    "fee_incl_gst": 87.1,
+    "page": 4
+  },
+  {
+    "code": "MF9",
+    "description": "Fractured distal radius and ulna: cast immobilisation not requiring reduction",
+    "fee_excl_gst": 126.17,
+    "fee_incl_gst": 145.1,
+    "page": 4
+  },
+  {
+    "code": "MF10",
+    "description": "Fractured distal radius and ulna requiring closed reduction, involving regional or other form of anaesthesia",
+    "fee_excl_gst": 150.85,
+    "fee_incl_gst": 173.48,
+    "page": 4
+  },
+  {
+    "code": "MF11",
+    "description": "Fractured shaft radius and ulna: treatment by cast immobilisation",
+    "fee_excl_gst": 126.17,
+    "fee_incl_gst": 145.1,
+    "page": 4
+  },
+  {
+    "code": "MF12",
+    "description": "Fractured distal humerus (supracondylar or condylar): by cast immobilisation",
+    "fee_excl_gst": 126.17,
+    "fee_incl_gst": 145.1,
+    "page": 4
+  },
+  {
+    "code": "MF13",
+    "description": "Fractured proximal or shaft humerus: immobilisation by collar and cuff or U-slab",
+    "fee_excl_gst": 76.51,
+    "fee_incl_gst": 87.99,
+    "page": 5
+  },
+  {
+    "code": "MF14",
+    "description": "Fractured shaft tibia and/or fibula: treatment by cast immobilisation with reduction",
+    "fee_excl_gst": 180.19,
+    "fee_incl_gst": 207.22,
+    "page": 5
+  },
+  {
+    "code": "MF15",
+    "description": "Fractured distal tibia and/or fibula: treatment by cast immobilisation with reduction",
+    "fee_excl_gst": 180.19,
+    "fee_incl_gst": 207.22,
+    "page": 5
+  },
+  {
+    "code": "MF16",
+    "description": "Fractured fibula (without tibial fracture): immobilisation with soft tissue strapping Maternal Birth Injuries",
+    "fee_excl_gst": 76.51,
+    "fee_incl_gst": 87.99,
+    "page": 5
+  },
+  {
+    "code": "ME1",
+    "description": "Internal Examination for Maternal Birth Injury Miscellaneous",
+    "fee_excl_gst": 41.34,
+    "fee_incl_gst": 47.54,
+    "page": 5
+  },
+  {
+    "code": "MM1",
+    "description": "Abscess or haematoma: drainage with incision (with or without local anaesthetic agent)",
+    "fee_excl_gst": 31.55,
+    "fee_incl_gst": 36.28,
+    "page": 5
+  },
+  {
+    "code": "MM2",
+    "description": "Insertion of IV line for administration of IV medications or electrolytes or transfusion (if provided under local or national guideline approved by ACC)",
+    "fee_excl_gst": 63.1,
+    "fee_incl_gst": 72.57,
+    "page": 5
+  },
+  {
+    "code": "MM3",
+    "description": "Nail, simple removal of",
+    "fee_excl_gst": 25.27,
+    "fee_incl_gst": 29.06,
+    "page": 5
+  },
+  {
+    "code": "MM4",
+    "description": "Nail, removal of or wedge resection: requiring the use of digital anaesthesia",
+    "fee_excl_gst": 105.14,
+    "fee_incl_gst": 120.91,
+    "page": 5
+  },
+  {
+    "code": "MM5",
+    "description": "Removal of embedded or impacted foreign body from cornea or conjunctiva (with use of topical anaesthetic), or from auditory canal or nasal passages, or from skin or subcutaneous tissue with incision, or from rectum or vagina",
+    "fee_excl_gst": 33.97,
+    "fee_incl_gst": 39.07,
+    "page": 5
+  },
+  {
+    "code": "MM6",
+    "description": "Pinch skin graft",
+    "fee_excl_gst": 78.89,
+    "fee_incl_gst": 90.72,
+    "page": 6
+  },
+  {
+    "code": "MM7",
+    "description": "Dental anaesthetic",
+    "fee_excl_gst": 29.47,
+    "fee_incl_gst": 33.89,
+    "page": 6
+  },
+  {
+    "code": "MM8",
+    "description": "Epistaxis: arrest during episode by nasal cavity packing with or without cautery Open wound",
+    "fee_excl_gst": 46.6,
+    "fee_incl_gst": 53.59,
+    "page": 6
+  },
+  {
+    "code": "MW1",
+    "description": "Closure of open wounds less than 2cm: any necessary care and treatment including cleaning and debriding, exploration, administration of anaesthetic, and dressing",
+    "fee_excl_gst": 37.15,
+    "fee_incl_gst": 42.72,
+    "page": 6
+  },
+  {
+    "code": "MW2",
+    "description": "Closure of open wound (or wounds) of skin and subcutaneous tissue or mucous membrane 2cm to 7cm long: any necessary care and treatment including cleaning and debriding, exploration, administration of anaesthetic, and dressing",
+    "fee_excl_gst": 70.89,
+    "fee_incl_gst": 81.52,
+    "page": 6
+  },
+  {
+    "code": "MW3",
+    "description": "Closure of open wound (or wounds) of skin and subcutaneous tissue or mucous membrane greater than 7cm long: any necessary care and treatment including cleaning and debriding, exploration, administration of anaesthetic, and dressing",
+    "fee_excl_gst": 93.81,
+    "fee_incl_gst": 107.88,
+    "page": 6
+  },
+  {
+    "code": "MW4",
+    "description": "Amputation of digit, including use of anaesthetic, debridement of bone and soft tissue, and closure of wound",
+    "fee_excl_gst": 105.14,
+    "fee_incl_gst": 120.91,
+    "page": 6
+  },
+  {
+    "code": "MT1",
+    "description": "Simple soft tissue injuries: management of simple sprain of wrist/ankle/knee/elbow or other soft tissue injury requiring crepe bandage or similar immobilisation not requiring formal strapping",
+    "fee_excl_gst": 16.5,
+    "fee_incl_gst": 18.98,
+    "page": 7
+  },
+  {
+    "code": "MT2",
+    "description": "Soft tissue injury (other than splinting of dislocated or fractured digit), unless specified elsewhere: application of plaster or padded splint or specific strapping within agreed guidelines (includes splinting of Achilles tendon injury and serious ankle sprains)",
+    "fee_excl_gst": 76.51,
+    "fee_incl_gst": 87.99,
+    "page": 7
+  },
+  {
+    "code": "MT3",
+    "description": "Aspiration of inflamed joint, tendon, bursa or other subcutaneous tissue or space (with or without injection)",
+    "fee_excl_gst": 37.12,
+    "fee_incl_gst": 42.69,
+    "page": 7
+  },
+  {
+    "code": "MT4",
+    "description": "Extensor tendon, primary repair",
+    "fee_excl_gst": 189.26,
+    "fee_incl_gst": 217.65,
+    "page": 7
+  },
+  {
+    "code": "MT5",
+    "description": "Ruptured Tendon Achilles; management by plaster immobilisation Ear Toileting by Ear Nurse Specialists and Nurses not in general practice",
+    "fee_excl_gst": 185.52,
+    "fee_incl_gst": 213.35,
+    "page": 7
+  },
+  {
+    "code": "EAR1",
+    "description": "Ear/Aural Toileting by microscope – Ear Nurse Specialist",
+    "fee_excl_gst": 46.55,
+    "fee_incl_gst": 53.53,
+    "page": 7
+  },
+  {
+    "code": "RN10",
+    "description": "Ear Toileting by general nurse (not in General Practice)",
+    "fee_excl_gst": 17.81,
+    "fee_incl_gst": 20.48,
+    "page": 7
+  }
+]

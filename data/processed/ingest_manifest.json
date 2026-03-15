@@ -1,0 +1,12 @@
+{
+  "source": "/home/pi/clawd/projects/RAG Funding Engine/data/raw/ACC1520-Med-pract-nurse-pract-and-nurses-costs-v2.pdf",
+  "source_hash": "85cf1f71bf63e260407c052d7f76cdbe48a4e48a4c64245eb6fe7b42944a0cfd",
+  "pages": 11,
+  "codes_parsed": 73,
+  "chunks_indexed": 37,
+  "artifacts": {
+    "text_pages": "/home/pi/clawd/projects/RAG Funding Engine/data/processed/acc1520_text_pages.json",
+    "codes": "/home/pi/clawd/projects/RAG Funding Engine/data/processed/acc1520_codes.json",
+    "db": "/home/pi/clawd/projects/RAG Funding Engine/data/processed/acc1520.sqlite3"
+  }
+}
