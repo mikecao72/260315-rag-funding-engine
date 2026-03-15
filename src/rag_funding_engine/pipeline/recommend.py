@@ -25,6 +25,34 @@ class Candidate:
     score: float
 
 
+def _get_db_path(schedule_id: str, base_dir: Path | None = None) -> Path:
+    """Get database path for a given schedule_id."""
+    if base_dir is None:
+        # Default: data/processed/{schedule_id}/{schedule_id}.sqlite3
+        from rag_funding_engine.api.main import ROOT
+        base_dir = ROOT / "data" / "processed"
+    return base_dir / schedule_id / f"{schedule_id}.sqlite3"
+
+
+def _get_manifest_path(schedule_id: str, base_dir: Path | None = None) -> Path:
+    """Get manifest path for a given schedule_id."""
+    if base_dir is None:
+        from rag_funding_engine.api.main import ROOT
+        base_dir = ROOT / "data" / "processed"
+    return base_dir / schedule_id / "manifest.json"
+
+
+def _load_profile(schedule_id: str, base_dir: Path | None = None) -> dict[str, Any]:
+    """Load schedule profile from manifest."""
+    manifest_path = _get_manifest_path(schedule_id, base_dir)
+    if not manifest_path.exists():
+        return {}
+    try:
+        return json.loads(manifest_path.read_text()).get("profile", {})
+    except Exception:
+        return {}
+
+
 def _tokens(text: str) -> set[str]:
     return {t.lower() for t in TOKEN_RE.findall(text or "") if len(t) > 2}
 
@@ -36,7 +64,8 @@ def _keyword_similarity(a: set[str], b: set[str]) -> float:
     return inter / max(1, len(a))
 
 
-def _extract_consult_facts(text: str, template: dict[str, Any] | None) -> dict[str, Any]:
+def _extract_consult_facts(text: str, template: dict[str, Any] | None, profile: dict[str, Any]) -> dict[str, Any]:
+    """Extract consult facts using LLM or heuristic, guided by profile."""
     if template:
         return {"mode": "template", "facts": template}
 
@@ -44,13 +73,16 @@ def _extract_consult_facts(text: str, template: dict[str, Any] | None) -> dict[s
     if not api_key:
         return {"mode": "heuristic", "facts": {"summary": text}}
 
+    # Build prompt based on profile key_dimensions
+    key_dims = profile.get("key_dimensions", ["injury_type", "body_site", "procedure", "severity"])
+    dims_str = ", ".join(key_dims)
+
     try:
         from openai import OpenAI
 
         client = OpenAI(api_key=api_key)
         prompt = (
-            "Extract consult billing-relevant facts as strict compact JSON with keys: "
-            "injury_type, body_site, procedure, severity, anaesthesia, consult_type, age_band. "
+            f"Extract consult billing-relevant facts as strict compact JSON with keys: {dims_str}. "
             "If unknown use null."
         )
         resp = client.chat.completions.create(
@@ -97,7 +129,8 @@ def _has_positive_fracture(text: str) -> bool:
     return has_term and not negated
 
 
-def _heuristic_boost(query_text: str, code: str, description: str) -> float:
+def _heuristic_boost(query_text: str, code: str, description: str, profile: dict[str, Any]) -> float:
+    """Apply heuristic boosts based on query text and code description."""
     t = query_text.lower()
     d = description.lower()
     boost = 0.0
@@ -108,6 +141,7 @@ def _heuristic_boost(query_text: str, code: str, description: str) -> float:
     dependent = any(k in t for k in ["dependent", "dependant", "child of"]) and has_csc
     nurse_gp_joint = ("nurse" in t and "gp" in t) and any(k in t for k in ["together", "jointly", "combined"])
 
+    # ACC1520-specific heuristics (preserved for backward compatibility)
     if code == "GP1" and age is not None and age >= 14 and not has_csc:
         boost += 0.9
         if any(k in t for k in ["urgent care", "clinic", "consult", "acc claim", "workplace"]):
@@ -221,10 +255,10 @@ def _has_multiple_injury_sites(text: str) -> bool:
     return hit >= 2
 
 
-def _apply_pricing_rules(recs: list[dict[str, Any]], query_text: str) -> list[dict[str, Any]]:
-    """Apply ACC-style multi-treatment pricing prototype.
-
-    Rule implemented:
+def _apply_pricing_rules(recs: list[dict[str, Any]], query_text: str, profile: dict[str, Any]) -> list[dict[str, Any]]:
+    """Apply schedule-specific pricing rules.
+    
+    Default rule:
     - Consultation code(s): full value.
     - Non-consult treatments: if 2+ treatments at same visit, pay full for highest-cost treatment
       and 50% for each additional treatment.
@@ -272,7 +306,7 @@ def _quoted_evidence(query_text: str, keywords: list[str], max_quotes: int = 2) 
     return hits
 
 
-def _reason_for_code(rec: dict[str, Any], query_text: str) -> str:
+def _reason_for_code(rec: dict[str, Any], query_text: str, profile: dict[str, Any]) -> str:
     t = query_text.lower()
     code = str(rec.get("code", ""))
     desc = str(rec.get("description", ""))
@@ -331,16 +365,9 @@ def _final_reasoning_review(
     query_text: str,
     consult_facts: dict[str, Any],
     recs: list[dict[str, Any]],
+    profile: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Optional final LLM adjudication step over candidate recommendations.
-
-    Uses a stronger reasoning model at the last stage to:
-    - suppress clearly incompatible candidates
-    - keep a concise final list
-    - attach concise rationale per kept code
-
-    Falls back to original heuristic-ranked recs on any error.
-    """
+    """Optional final LLM adjudication step over candidate recommendations."""
     if not recs:
         return recs
 
@@ -349,13 +376,14 @@ def _final_reasoning_review(
         return recs
 
     model = os.getenv("FINAL_REASONING_MODEL", "gpt-5.4")
+    schedule_type = profile.get("schedule_type", "medical")
 
     try:
         from openai import OpenAI
 
         client = OpenAI(api_key=api_key)
         prompt = (
-            "You are the final clinical billing adjudicator for ACC1520 prototype outputs. "
+            f"You are the final clinical billing adjudicator for {schedule_type} schedule outputs. "
             "Given consult input, extracted facts, and candidate codes, return STRICT JSON with key 'final_recommendations'. "
             "Each item must include: code, keep (boolean), reason (short). "
             "Rules: respect explicit negations in input (e.g. 'no fracture', 'no amputation'); "
@@ -415,15 +443,15 @@ def _final_reasoning_review(
         return recs
 
 
-def _fetch_semantic_chunks(cur: sqlite3.Cursor, schedule_version: str, query_text: str, top_n: int = 3) -> list[dict[str, Any]]:
+def _fetch_semantic_chunks(cur: sqlite3.Cursor, schedule_id: str, query_text: str, top_n: int = 3) -> list[dict[str, Any]]:
     cur.execute(
         """
         SELECT p.page, p.chunk_text, e.embedding_json
         FROM policy_chunks p
         JOIN policy_chunk_embeddings e ON e.chunk_id = p.id
-        WHERE p.schedule_version = ? AND e.schedule_version = ?
+        WHERE p.schedule_id = ? AND e.schedule_id = ?
         """,
-        (schedule_version, schedule_version),
+        (schedule_id, schedule_id),
     )
     rows = cur.fetchall()
     if not rows:
@@ -445,12 +473,35 @@ def _fetch_semantic_chunks(cur: sqlite3.Cursor, schedule_version: str, query_tex
 
 
 def recommend_codes(
-    db_path: Path,
+    schedule_id: str,
     consult_text: str | None,
     consult_template: dict[str, Any] | None,
-    schedule_version: str = "ACC1520-v2",
+    base_dir: Path | None = None,
     top_n: int = 5,
 ) -> dict[str, Any]:
+    """
+    Recommend billing codes for a consultation.
+    
+    Args:
+        schedule_id: Identifier for the schedule (e.g., "acc1520-medical", "acc2024-gp")
+        consult_text: Free-text clinical notes
+        consult_template: Optional structured template
+        base_dir: Base directory for processed data
+        top_n: Number of recommendations to return
+    """
+    # Load profile for this schedule
+    profile = _load_profile(schedule_id, base_dir)
+    
+    # Get database path
+    db_path = _get_db_path(schedule_id, base_dir)
+    if not db_path.exists():
+        return {
+            "error": f"Schedule not found: {schedule_id}",
+            "schedule_id": schedule_id,
+            "db_path": str(db_path),
+            "recommendations": [],
+        }
+
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
@@ -458,10 +509,10 @@ def recommend_codes(
     cur.execute(
         """
         SELECT code, description, fee_excl_gst, fee_incl_gst, page
-        FROM acc_codes
-        WHERE schedule_version = ?
+        FROM schedule_codes
+        WHERE schedule_id = ?
         """,
-        (schedule_version,),
+        (schedule_id,),
     )
     rows = cur.fetchall()
 
@@ -470,7 +521,7 @@ def recommend_codes(
         template_text = " ".join(f"{k} {v}" for k, v in consult_template.items())
 
     query_text = f"{consult_text or ''} {template_text}".strip()
-    consult_facts = _extract_consult_facts(consult_text or "", consult_template)
+    consult_facts = _extract_consult_facts(consult_text or "", consult_template, profile)
     query_tokens = _tokens(query_text)
 
     candidates: list[Candidate] = []
@@ -487,7 +538,7 @@ def recommend_codes(
 
         desc_tokens = _tokens(desc)
         keyword_score = _keyword_similarity(query_tokens, desc_tokens)
-        score = keyword_score + _heuristic_boost(query_text, code, desc)
+        score = keyword_score + _heuristic_boost(query_text, code, desc, profile)
         if score <= 0.05:
             continue
         candidates.append(
@@ -536,25 +587,25 @@ def recommend_codes(
         allowed = {"GP1", "MF15", "MF14", "MF16", "MW1", "MW2", "MW3"}
         recs = [r for r in recs if r["code"] in allowed]
 
-    recs = _final_reasoning_review(query_text, consult_facts, recs)
+    recs = _final_reasoning_review(query_text, consult_facts, recs, profile)
     recs = _select_primary_consult(recs)
     constraints_result = apply_basic_constraints(recs, consult_facts)
-    recs = _apply_pricing_rules(recs, query_text)
+    recs = _apply_pricing_rules(recs, query_text, profile)
 
     for r in recs:
-        base_reason = _reason_for_code(r, query_text)
+        base_reason = _reason_for_code(r, query_text, profile)
         llm_reason = str(r.get("llm_reason") or "").strip()
         r["reason"] = f"{base_reason} | Final-model review: {llm_reason}" if llm_reason else base_reason
 
     total_excl = sum((r.get("line_total_excl_gst") or 0.0) for r in recs)
     total_incl = sum(((r.get("fee_incl_gst") or 0.0) * (r.get("pricing_multiplier") or 1.0)) for r in recs)
 
-    evidence_chunks = _fetch_semantic_chunks(cur, schedule_version, query_text, top_n=3)
+    evidence_chunks = _fetch_semantic_chunks(cur, schedule_id, query_text, top_n=3)
     if not evidence_chunks:
         # Fallback if semantic index not built yet.
         cur.execute(
-            "SELECT page, chunk_text FROM policy_chunks WHERE schedule_version = ? LIMIT 300",
-            (schedule_version,),
+            "SELECT page, chunk_text FROM policy_chunks WHERE schedule_id = ? LIMIT 300",
+            (schedule_id,),
         )
         chunks = cur.fetchall()
         scored = []
@@ -570,7 +621,8 @@ def recommend_codes(
     return {
         "query": query_text,
         "consult_facts": consult_facts,
-        "schedule_version": schedule_version,
+        "schedule_id": schedule_id,
+        "profile": profile,
         "recommendations": recs,
         "estimated_total_excl_gst": round(total_excl, 2),
         "estimated_total_incl_gst": round(total_incl, 2),
@@ -580,7 +632,7 @@ def recommend_codes(
             "reasons": constraints_result.reasons,
         },
         "notes": [
-            "Prototype model with optional OpenAI fact extraction + semantic evidence retrieval.",
-            "Hard ACC rule constraints still require explicit implementation for production use.",
+            "Generic RAG model with dynamic schedule profiling.",
+            "Schedule-specific constraints applied based on profile.",
         ],
     }

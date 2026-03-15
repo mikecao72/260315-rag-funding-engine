@@ -1,19 +1,22 @@
-# ACC RAG Funding Engine
+# RAG Funding Engine
 
-A RAG-driven (Retrieval-Augmented Generation) system for ACC1520 medical billing code recommendation. This engine transforms unstructured clinical consultation notes into ranked, explainable ACC funding code recommendations with fee estimates.
+A RAG-driven (Retrieval-Augmented Generation) system for medical billing code recommendation. This engine transforms unstructured clinical consultation notes into ranked, explainable funding code recommendations with fee estimates.
+
+**Now with generic schedule support** - ingest ANY fee schedule document, not just ACC1520!
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Data Model](#data-model)
-3. [Ingestion Pipeline](#ingestion-pipeline)
-4. [Query Pipeline](#query-pipeline)
-5. [API](#api)
-6. [Configuration](#configuration)
-7. [Running It](#running-it)
-8. [Testing](#testing)
+2. [Generic Schedule Ingestion](#generic-schedule-ingestion)
+3. [Data Model](#data-model)
+4. [Ingestion Pipeline](#ingestion-pipeline)
+5. [Query Pipeline](#query-pipeline)
+6. [API](#api)
+7. [Configuration](#configuration)
+8. [Running It](#running-it)
+9. [Testing](#testing)
 
 ---
 
@@ -21,21 +24,20 @@ A RAG-driven (Retrieval-Augmented Generation) system for ACC1520 medical billing
 
 ### What Problem Does This Solve?
 
-New Zealand's Accident Compensation Corporation (ACC) publishes the **ACC1520 schedule** — a complex document containing hundreds of billing codes, fees, and rules for medical practitioners and nurses treating accident-related injuries. 
-
-Clinicians face the challenge of:
+Medical fee schedules are complex documents containing hundreds of billing codes, fees, and rules. Clinicians face the challenge of:
 - **Mapping** unstructured clinical notes to the correct billing codes
-- **Navigating** complex rules (CSC eligibility, age bands, procedure combinations)
+- **Navigating** complex rules (eligibility, age bands, procedure combinations, location modifiers)
 - **Optimizing** revenue while staying compliant
 - **Documenting** rationale for audit purposes
 
-The ACC RAG Funding Engine solves this by:
-1. **Ingesting** the ACC1520 PDF into structured relational data + vector embeddings
-2. **Accepting** free-text clinical consultation notes
-3. **Retrieving** candidate codes via keyword matching + semantic search
-4. **Filtering** through constraint rules and heuristics
-5. **Ranking** with an optional LLM adjudication layer
-6. **Explaining** every recommendation with quoted evidence from the input
+The RAG Funding Engine solves this by:
+1. **Ingesting** ANY fee schedule PDF into structured relational data + vector embeddings
+2. **Dynamically profiling** the schedule using LLM analysis
+3. **Accepting** free-text clinical consultation notes
+4. **Retrieving** candidate codes via keyword matching + semantic search
+5. **Filtering** through constraint rules and heuristics
+6. **Ranking** with an optional LLM adjudication layer
+7. **Explaining** every recommendation with quoted evidence from the input
 
 ### Example Use Case
 
@@ -56,11 +58,78 @@ Active anterior epistaxis from right nostril. Persistent epistaxis treated with 
 
 ---
 
+## Generic Schedule Ingestion
+
+The engine now supports **any** fee schedule document through dynamic profiling.
+
+### ScheduleProfile
+
+When you ingest a schedule, the LLM analyzes it and generates a `ScheduleProfile`:
+
+```python
+@dataclass
+class ScheduleProfile:
+    schedule_type: str           # "urgent_care", "rural", "gp", "specialist", etc.
+    description: str             # Human-readable description
+    key_dimensions: list[str]    # Factors that affect billing
+    unique_rules: list[str]      # Schedule-specific billing rules
+    query_patterns: list[str]    # Template patterns for searching
+    example_queries: list[str]   # Example natural language queries
+    location_matters: bool       # Whether location affects pricing
+    mileage_reimbursable: bool   # Whether travel is billable
+    after_hours_premium: bool    # Whether after-hours premiums apply
+```
+
+### Example Profiles
+
+**ACC1520 Medical Schedule:**
+```json
+{
+  "schedule_type": "urgent_care",
+  "description": "ACC urgent care schedule for medical practitioners and nurses",
+  "key_dimensions": ["injury_type", "body_site", "procedure", "severity", "age_band"],
+  "unique_rules": ["CSC eligibility affects consultation codes", "Multi-treatment pricing applies"],
+  "query_patterns": ["{procedure} {body_site}", "{injury_type} treatment"],
+  "example_queries": ["laceration hand", "distal radius fracture"],
+  "location_matters": false,
+  "mileage_reimbursable": false,
+  "after_hours_premium": false
+}
+```
+
+**Rural Practitioner Schedule:**
+```json
+{
+  "schedule_type": "rural",
+  "description": "Rural practitioner schedule with travel modifiers",
+  "key_dimensions": ["location", "travel_time", "mileage", "after_hours"],
+  "unique_rules": ["Travel >20km bills separately", "Rural loading applies"],
+  "query_patterns": ["{specialty} {location}", "travel {distance}"],
+  "example_queries": ["GP rural clinic", "travel 45km"],
+  "location_matters": true,
+  "mileage_reimbursable": true,
+  "after_hours_premium": true
+}
+```
+
+---
+
 ## Data Model
+
+### Per-Schedule Storage Structure
+
+Each schedule gets its own directory:
+
+```
+data/processed/{schedule_id}/
+├── {schedule_id}.sqlite3       # Database with codes, chunks, embeddings
+├── manifest.json               # Includes ScheduleProfile
+└── embeddings/                 # Optional external vector store
+```
 
 ### SQLite Relational Database
 
-The system uses SQLite (`data/processed/acc1520.sqlite3`) with the following schema:
+The system uses SQLite with the following generic schema:
 
 #### `schedule_versions`
 Tracks ingested PDF versions for auditability.
@@ -68,38 +137,25 @@ Tracks ingested PDF versions for auditability.
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | INTEGER PK | Auto-increment ID |
-| `version` | TEXT UNIQUE | Schedule version identifier (e.g., "ACC1520-v2") |
+| `schedule_id` | TEXT UNIQUE | Schedule identifier (e.g., "acc1520-medical") |
+| `version` | TEXT | Version string |
 | `source_hash` | TEXT | SHA256 hash of source PDF |
 | `source_path` | TEXT | Path to original PDF |
 
-#### `acc_codes`
-The core billing code table extracted from the schedule.
+#### `schedule_codes`
+The core billing code table (generic, works for any schedule).
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | INTEGER PK | Auto-increment ID |
-| `schedule_version` | TEXT | Foreign key to schedule_versions |
+| `schedule_id` | TEXT | Schedule identifier |
 | `code` | TEXT | Billing code (e.g., "GNCD", "MW2", "MF9") |
 | `description` | TEXT | Full code description from schedule |
 | `fee_excl_gst` | REAL | Fee excluding GST |
 | `fee_incl_gst` | REAL | Fee including GST |
 | `page` | INTEGER | Source page number in PDF |
 
-**Unique constraint:** `(schedule_version, code)`
-
-**Example rows:**
-```sql
-SELECT code, description, fee_excl_gst, fee_incl_gst, page
-FROM acc_codes
-WHERE schedule_version = 'ACC1520-v2'
-LIMIT 3;
-```
-
-| code | description | fee_excl_gst | fee_incl_gst | page |
-|------|-------------|--------------|--------------|------|
-| GNCD | GP Consultation Dependent CSC 14–17 years | 37.50 | 43.13 | 8 |
-| MW2 | Laceration 2–7 cm | 68.75 | 79.06 | 12 |
-| MF9 | Distal radius/ulna without reduction | 124.44 | 143.11 | 15 |
+**Unique constraint:** `(schedule_id, code)`
 
 #### `policy_chunks`
 Text chunks extracted from the PDF for semantic search.
@@ -107,7 +163,7 @@ Text chunks extracted from the PDF for semantic search.
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | INTEGER PK | Auto-increment ID |
-| `schedule_version` | TEXT | Version identifier |
+| `schedule_id` | TEXT | Schedule identifier |
 | `page` | INTEGER | Source page number |
 | `chunk_text` | TEXT | Chunk of extracted text (~120 words) |
 
@@ -117,15 +173,13 @@ Vector embeddings for semantic similarity search.
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | INTEGER PK | Auto-increment ID |
-| `schedule_version` | TEXT | Version identifier |
+| `schedule_id` | TEXT | Schedule identifier |
 | `chunk_id` | INTEGER | Foreign key to policy_chunks |
 | `embedding_json` | TEXT | JSON-serialized embedding vector |
 
-**Unique constraint:** `(schedule_version, chunk_id)`
-
 ### Vector Store / Embeddings
 
-The system uses **OpenAI `text-embedding-3-small`** (1536 dimensions) for semantic search. Embeddings are stored as JSON in SQLite and computed at ingestion time.
+The system uses **OpenAI `text-embedding-3-small`** (1536 dimensions) for semantic search.
 
 **Fallback behavior:** If `OPENAI_API_KEY` is not available, the system falls back to deterministic pseudo-embeddings (128-dimensional hash-based vectors) for offline development.
 
@@ -141,9 +195,9 @@ similarity = cosine_similarity(query_embedding, chunk_embedding)
 
 ## Ingestion Pipeline
 
-### How the ACC1520 PDF Gets Processed
+### How Any Schedule PDF Gets Processed
 
-**Entry point:** `rag_funding_engine.pipeline.ingest_acc1520.ingest_schedule()`
+**Entry point:** `rag_funding_engine.pipeline.ingest_schedule.ingest_schedule()`
 
 **Steps:**
 
@@ -154,42 +208,55 @@ similarity = cosine_similarity(query_embedding, chunk_embedding)
    pages = [{"page": i, "text": page.extract_text()} for i, page in enumerate(reader.pages, 1)]
    ```
 
-2. **Code Row Parsing**
+2. **LLM Analysis → ScheduleProfile**
+   ```python
+   profile = _analyze_schedule_with_llm(full_text, model=llm_model)
+   ```
+   The LLM analyzes the document and generates a profile describing:
+   - Schedule type (urgent_care, rural, gp, etc.)
+   - Key dimensions that affect billing
+   - Unique rules
+   - Query patterns
+
+3. **Code Row Parsing**
    - Pattern matches lines like: `GNCD GP Consultation Dependent CSC 14–17 years 37.50 43.13`
    - Regex: `^([A-Z]{2,6}\d{0,3})\s+(.+)$`
-   - Handles multi-line descriptions by continuing until next code or price line
+   - Handles multi-line descriptions
    - Extracts fees using: `\b\d{1,4}\.\d{2}\b`
 
-3. **Deduplication**
+4. **Deduplication**
    - Keeps last occurrence if duplicate codes exist
-   - Uses dict: `{row["code"]: row for row in code_rows}`
 
-4. **Database Population**
+5. **Database Population**
    - Creates/updates `schedule_versions` record
-   - Bulk inserts into `acc_codes`
+   - Bulk inserts into `schedule_codes`
    - Chunks text into ~120-word segments for `policy_chunks`
 
-5. **Embedding Generation**
-   ```python
-   from rag_funding_engine.pipeline.semantic import index_policy_chunks
-   indexed_count = index_policy_chunks(db_path, schedule_version="ACC1520-v2")
-   ```
-   - Queries all chunks without embeddings
-   - Calls OpenAI Embeddings API in batches
+6. **Embedding Generation**
+   - Generates embeddings for all chunks
    - Stores as JSON in `policy_chunk_embeddings`
 
-6. **Artifact Generation**
-   - `acc1520_text_pages.json` — Raw extracted text per page
-   - `acc1520_codes.json` — Parsed code rows
-   - `ingest_manifest.json` — Processing metadata
+7. **Artifact Generation**
+   - `{schedule_id}_text_pages.json` — Raw extracted text per page
+   - `{schedule_id}_codes.json` — Parsed code rows
+   - `manifest.json` — Processing metadata + ScheduleProfile
 
-### What Comes Out
+### Ingesting a New Schedule
 
-After ingestion, you have:
-- **~73-200 billing codes** (depending on PDF version)
-- **Policy chunks** for semantic search
-- **Embeddings** for similarity retrieval
-- **Audit trail** via source hash and manifest
+```python
+from pathlib import Path
+from rag_funding_engine.pipeline.ingest_schedule import ingest_schedule
+
+result = ingest_schedule(
+    pdf_path=Path("/path/to/schedule.pdf"),
+    schedule_id="my-schedule-2024",  # Unique identifier
+    out_dir=Path("data/processed"),
+    llm_model="gpt-4o",
+)
+
+print(f"Ingested {result.code_count} codes")
+print(f"Profile: {result.profile.schedule_type}")
+```
 
 ---
 
@@ -197,236 +264,33 @@ After ingestion, you have:
 
 This is the core recommendation engine. Flow: **Input → Decomposition → Relational Lookup → Semantic Search → Constraint Filtering → Context Assembly → LLM Reasoning → Output**
 
-### Step 1: Input
+### Key Difference: Profile-Guided Queries
 
-**Accepts:**
-- `consult_text`: Free-text clinical notes (required)
-- `consult_template`: Optional structured dict for future form-based input
+The pipeline now uses the schedule's `ScheduleProfile` to:
+- Extract relevant facts using `key_dimensions`
+- Generate queries using `query_patterns`
+- Apply schedule-specific constraints
 
-**Example input:**
+### Example: Using Different Schedules
+
 ```python
-{
-    "consult_text": "32-year-old male construction worker. 6 cm laceration across dorsum of left hand...",
-    "consult_template": None,
-    "top_n": 5
-}
-```
+from rag_funding_engine.pipeline.recommend import recommend_codes
 
-The system concatenates both sources:
-```python
-query_text = f"{consult_text or ''} {template_text}".strip()
-```
-
-### Step 2: Query Decomposition
-
-**Fact Extraction:**
-
-If `OPENAI_API_KEY` is available:
-```python
-prompt = (
-    "Extract consult billing-relevant facts as strict compact JSON with keys: "
-    "injury_type, body_site, procedure, severity, anaesthesia, consult_type, age_band. "
-    "If unknown use null."
+# Query ACC1520 urgent care schedule
+result = recommend_codes(
+    schedule_id="acc1520-medical",
+    consult_text="6 cm laceration left hand...",
+    consult_template=None,
+    top_n=5,
 )
 
-response = client.chat.completions.create(
-    model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),
-    temperature=0,
-    response_format={"type": "json_object"},
-    messages=[
-        {"role": "system", "content": prompt},
-        {"role": "user", "content": text},
-    ],
+# Query rural practitioner schedule
+result = recommend_codes(
+    schedule_id="rural-gp-2024",
+    consult_text="GP consultation, patient 45km from clinic...",
+    consult_template=None,
+    top_n=5,
 )
-```
-
-**Fallback:** Returns `{"mode": "heuristic", "facts": {"summary": text}}`
-
-**Tokenization:**
-```python
-TOKEN_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9\-]{1,}")
-query_tokens = {t.lower() for t in TOKEN_RE.findall(query_text) if len(t) > 2}
-```
-
-### Step 3: Relational DB Lookup
-
-**SQL Query:**
-```sql
-SELECT code, description, fee_excl_gst, fee_incl_gst, page
-FROM acc_codes
-WHERE schedule_version = ?
-```
-
-**Returns:** All codes for the specified schedule version (typically 73+ rows).
-
-**Python-side filtering:**
-- Drops pseudo-rows (`ACC`, `Code`)
-- Drops CSC variants if input explicitly states "no Community Services Card"
-- Drops amputation codes (`MW4*`) unless positive amputation context detected
-
-### Step 4: Semantic/Vector Search
-
-**Embedding the query:**
-```python
-from rag_funding_engine.pipeline.semantic import embed_texts
-q_emb = embed_texts([query_text])[0]  # 1536-dim OpenAI or 128-dim fallback
-```
-
-**Retrieving chunks:**
-```sql
-SELECT p.page, p.chunk_text, e.embedding_json
-FROM policy_chunks p
-JOIN policy_chunk_embeddings e ON e.chunk_id = p.id
-WHERE p.schedule_version = ? AND e.schedule_version = ?
-```
-
-**Scoring:**
-```python
-scored = []
-for row in rows:
-    emb = json.loads(row["embedding_json"])
-    score = cosine_similarity(q_emb, emb)
-    scored.append((score, row["page"], row["chunk_text"][:300]))
-
-scored.sort(key=lambda x: x[0], reverse=True)
-top_chunks = scored[:3]  # Top 3 semantic matches
-```
-
-**Fallback:** If no embeddings exist, falls back to keyword similarity on raw chunks.
-
-### Step 5: Constraint Filtering
-
-**Hard Gates (in `recommend.py`):**
-
-1. **Score threshold:** Drop if `combined_score <= 0.05`
-2. **Prefix deduplication:** Keep highest-scoring code per alpha prefix family
-   ```python
-   prefix = re.sub(r"\d+$", "", c.code)  # "GNCD" → "GN"
-   if prefix in seen_prefixes and c.score < 0.95:
-       continue
-   ```
-3. **Context gates:**
-   - Distal radius/ulna fracture → only allow `GP1`, `MF9`, `MF10`, `GP14`, `GPN`
-   - Distal tibia/fibula fracture → only allow `GP1`, `MF15`, `MF14`, `MF16`, `MW1`, `MW2`, `MW3`
-
-**Constraint Engine (`constraints.py`):**
-```python
-from rag_funding_engine.pipeline.constraints import apply_basic_constraints
-
-result = apply_basic_constraints(recommendations, consult_facts)
-# Returns: RuleResult(allowed=True, reasons=[...])
-```
-
-Current constraint rules:
-1. Remove duplicate family candidates (same alpha prefix)
-2. Filter GP-prefixed codes for nurse consult types
-
-### Step 6: Context Assembly
-
-**Candidate payload for LLM adjudication:**
-```python
-payload = {
-    "query_text": query_text,
-    "consult_facts": consult_facts,
-    "candidates": [
-        {
-            "code": r.get("code"),
-            "description": r.get("description"),
-            "fee_excl_gst": r.get("fee_excl_gst"),
-            "match_score": r.get("match_score"),
-        }
-        for r in recs
-    ],
-}
-```
-
-**Evidence chunks:**
-```python
-evidence_chunks = [
-    {"page": p, "score": round(s, 4), "snippet": t}
-    for s, p, t in top_semantic_matches
-]
-```
-
-### Step 7: LLM Reasoning
-
-**Final Adjudication Stage (`_final_reasoning_review`):**
-
-```python
-prompt = (
-    "You are the final clinical billing adjudicator for ACC1520 prototype outputs. "
-    "Given consult input, extracted facts, and candidate codes, return STRICT JSON with key 'final_recommendations'. "
-    "Each item must include: code, keep (boolean), reason (short). "
-    "Rules: respect explicit negations in input (e.g. 'no fracture', 'no amputation'); "
-    "prefer specific clinically-supported items; avoid mutually incompatible/same-family duplicates unless clearly justified; "
-    "retain at most 6 final codes. Do not invent codes not present in candidates."
-)
-
-response = client.chat.completions.create(
-    model=os.getenv("FINAL_REASONING_MODEL", "gpt-5.4"),
-    temperature=0,
-    response_format={"type": "json_object"},
-    messages=[
-        {"role": "system", "content": prompt},
-        {"role": "user", "content": json.dumps(payload)},
-    ],
-)
-```
-
-**Fallback:** Returns original heuristic-ranked recommendations on any error.
-
-**Primary Consult Selection:**
-```python
-recs = _select_primary_consult(recs)
-# Sorts consultation codes by score+fee, keeps highest as primary
-```
-
-### Step 8: Output
-
-**Final response structure:**
-```python
-{
-    "query": "full query text...",
-    "consult_facts": {
-        "mode": "llm",  # or "heuristic"
-        "facts": {...}  # extracted structured facts
-    },
-    "schedule_version": "ACC1520-v2",
-    "recommendations": [
-        {
-            "code": "MW2",
-            "description": "Laceration 2–7 cm",
-            "fee_excl_gst": 68.75,
-            "fee_incl_gst": 79.06,
-            "page": 12,
-            "match_score": 2.66,
-            "pricing_multiplier": 1.0,
-            "line_total_excl_gst": 68.75,
-            "quantity": 1,
-            "reason": "MW2 selected because laceration dimensions align with 2–7 cm range..."
-        }
-    ],
-    "estimated_total_excl_gst": 140.63,
-    "estimated_total_incl_gst": 161.72,
-    "evidence_chunks": [
-        {"page": 12, "score": 0.8234, "snippet": "Laceration repair..."}
-    ],
-    "constraint_checks": {
-        "allowed": True,
-        "reasons": ["Removed duplicate family candidate: MW1"]
-    },
-    "notes": [
-        "Prototype model with optional OpenAI fact extraction + semantic evidence retrieval.",
-        "Hard ACC rule constraints still require explicit implementation for production use."
-    ]
-}
-```
-
-**Reason format per code:**
-```
-{code} selected because {reasons}. Quoted input: "{snippet}" | "{snippet}". 
-Priced at {full|50%} rate for this visit. 
-Relevant schedule descriptor: {description}
 ```
 
 ---
@@ -447,16 +311,30 @@ Health check endpoint.
 ```
 
 #### `POST /ingest`
-Trigger PDF ingestion pipeline.
+Ingest any schedule document.
+
+**Request:**
+- `pdf`: UploadFile (PDF document)
+- `schedule_id`: str (unique identifier, e.g., "acc1520-rural")
+- `llm_model`: str (optional, default: "gpt-4o")
 
 **Response:**
 ```json
 {
     "status": "ok",
-    "db_path": "/home/pi/clawd/projects/RAG Funding Engine/data/processed/acc1520.sqlite3",
+    "schedule_id": "acc1520-rural",
+    "db_path": "data/processed/acc1520-rural/acc1520-rural.sqlite3",
     "code_count": 73,
     "indexed_chunks": 45,
-    "manifest": "/home/pi/clawd/projects/RAG Funding Engine/data/processed/ingest_manifest.json"
+    "manifest": "data/processed/acc1520-rural/manifest.json",
+    "profile": {
+        "schedule_type": "rural",
+        "description": "Rural practitioner schedule with travel modifiers",
+        "key_dimensions": ["location", "travel_time", "mileage"],
+        "location_matters": true,
+        "mileage_reimbursable": true,
+        "after_hours_premium": false
+    }
 }
 ```
 
@@ -468,21 +346,106 @@ Main recommendation endpoint.
 {
     "consult_text": "47-year-old female... distal radius and ulna fracture...",
     "consult_template": null,
+    "schedule_id": "acc1520-medical",
     "top_n": 5
 }
 ```
 
-**Response:** See [Step 8: Output](#step-8-output) for full schema.
+**Response:**
+```json
+{
+    "query": "full query text...",
+    "consult_facts": {
+        "mode": "llm",
+        "facts": {...}
+    },
+    "schedule_id": "acc1520-medical",
+    "profile": {
+        "schedule_type": "urgent_care",
+        "key_dimensions": ["injury_type", "body_site", "procedure"]
+    },
+    "recommendations": [...],
+    "estimated_total_excl_gst": 140.63,
+    "estimated_total_incl_gst": 161.72,
+    "evidence_chunks": [...],
+    "constraint_checks": {...}
+}
+```
 
-### Example API Call
+#### `GET /schedules`
+List all ingested schedules.
 
+**Response:**
+```json
+{
+    "schedules": [
+        {
+            "schedule_id": "acc1520-medical",
+            "description": "ACC urgent care schedule",
+            "schedule_type": "urgent_care",
+            "codes_parsed": 73,
+            "chunks_indexed": 45
+        },
+        {
+            "schedule_id": "rural-gp-2024",
+            "description": "Rural practitioner schedule",
+            "schedule_type": "rural",
+            "codes_parsed": 56,
+            "chunks_indexed": 38
+        }
+    ]
+}
+```
+
+#### `GET /schedules/{schedule_id}`
+Get details of a specific schedule.
+
+**Response:**
+```json
+{
+    "schedule_id": "acc1520-medical",
+    "source": "/path/to/ACC1520.pdf",
+    "source_hash": "abc123...",
+    "pages": 25,
+    "codes_parsed": 73,
+    "chunks_indexed": 45,
+    "profile": {
+        "schedule_type": "urgent_care",
+        "description": "ACC urgent care schedule",
+        "key_dimensions": ["injury_type", "body_site", "procedure"],
+        "unique_rules": ["CSC eligibility affects consultation codes"],
+        "query_patterns": ["{procedure} {body_site}"],
+        "example_queries": ["laceration hand"],
+        "location_matters": false,
+        "mileage_reimbursable": false,
+        "after_hours_premium": false
+    }
+}
+```
+
+### Example API Calls
+
+**Ingest a new schedule:**
+```bash
+curl -X POST http://localhost:8010/ingest \
+  -F "pdf=@/path/to/rural-schedule.pdf" \
+  -F "schedule_id=rural-gp-2024"
+```
+
+**Get recommendations:**
 ```bash
 curl -X POST http://localhost:8010/recommend \
   -H "Content-Type: application/json" \
   -d '{
-    "consult_text": "32-year-old male. 6 cm laceration left hand. Embedded metal fragment removed.",
+    "consult_text": "32-year-old male. 6 cm laceration left hand.",
+    "schedule_id": "acc1520-medical",
     "top_n": 3
   }'
+```
+
+**List schedules:**
+```bash
+curl http://localhost:8010/schedules
 ```
 
 ---
@@ -497,17 +460,15 @@ curl -X POST http://localhost:8010/recommend \
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
 | `LLM_MODEL` | `gpt-4.1-mini` | Model for consult fact extraction |
 | `FINAL_REASONING_MODEL` | `gpt-5.4` | Model for final recommendation adjudication |
-| `SCHEDULE_VERSION` | `ACC1520-v2` | Default schedule version to query |
-| `DATABASE_URL` | — | Postgres URL (future use; currently uses SQLite) |
 
 ### File Paths
 
 | Path | Description |
 |------|-------------|
-| `data/raw/ACC1520-Med-pract-nurse-pract-and-nurses-costs-v2.pdf` | Source PDF |
-| `data/processed/acc1520.sqlite3` | SQLite database |
-| `data/processed/ingest_manifest.json` | Ingestion metadata |
-| `data/processed/acc1520_codes.json` | Parsed codes JSON |
+| `data/raw/` | Source PDFs |
+| `data/processed/{schedule_id}/` | Per-schedule processed data |
+| `data/processed/{schedule_id}/{schedule_id}.sqlite3` | SQLite database |
+| `data/processed/{schedule_id}/manifest.json` | Ingestion metadata + profile |
 
 ---
 
@@ -517,7 +478,7 @@ curl -X POST http://localhost:8010/recommend \
 
 1. **Create virtual environment:**
    ```bash
-   cd "/home/pi/clawd/projects/RAG Funding Engine"
+   cd "/home/pi/clawd/projects/rag-funding-engine"
    python3 -m venv .venv
    source .venv/bin/activate
    ```
@@ -536,20 +497,12 @@ curl -X POST http://localhost:8010/recommend \
 ### Run Backend
 
 ```bash
-cd "/home/pi/clawd/projects/RAG Funding Engine"
+cd "/home/pi/clawd/projects/rag-funding-engine"
 source .venv/bin/activate
 PYTHONPATH=src uvicorn rag_funding_engine.api.main:app --host 0.0.0.0 --port 8010
 ```
 
 The API will be available at `http://localhost:8010`.
-
-### Run Ingestion
-
-Ingestion runs automatically on first `/recommend` call if no database exists, or manually:
-
-```bash
-curl -X POST http://localhost:8010/ingest
-```
 
 ### Run Frontend (Mission Control)
 
@@ -574,6 +527,7 @@ Test cases are defined in `tests/regression_cases.json`:
     "id": "hand_laceration_6cm_foreign_body",
     "input": {
       "consult_text": "32-year-old male construction worker...",
+      "schedule_id": "acc1520-medical",
       "top_n": 3
     },
     "expected": {
@@ -588,25 +542,11 @@ Test cases are defined in `tests/regression_cases.json`:
 
 ### Running Tests
 
-**Manual validation via API:**
 ```bash
-curl -X POST http://localhost:8010/recommend \
-  -H "Content-Type: application/json" \
-  -d '@tests/regression_cases.json[0].input'
+cd "/home/pi/clawd/projects/rag-funding-engine"
+source .venv/bin/activate
+pytest tests/
 ```
-
-**Smoke test coverage:**
-The regression cases cover:
-- Hand laceration with foreign body removal (MW2 + MM5 combo)
-- Distal radius/ulna fracture without reduction (MF9 routing)
-- Distal tibia/fibula fracture with reduction + scalp laceration (MF15 + MW1 combo)
-
-### What the Tests Validate
-
-1. **Code inclusion:** Expected codes appear in recommendations
-2. **Ranking:** Primary code matches expected top code
-3. **Pricing:** Total fee estimate within tolerance
-4. **Constraint compliance:** No mutually incompatible codes returned
 
 ### Adding New Test Cases
 
@@ -616,6 +556,7 @@ Add to `tests/regression_cases.json`:
   "id": "unique_case_id",
   "input": {
     "consult_text": "Clinical description...",
+    "schedule_id": "acc1520-medical",
     "top_n": 5
   },
   "expected": {
@@ -631,42 +572,56 @@ Add to `tests/regression_cases.json`:
 
 ## Architecture Notes
 
-### Heuristic Scoring Formula
+### Multi-Schedule Support
 
-```python
-combined_score = keyword_similarity(query_tokens, desc_tokens) + heuristic_boost(query_text, code, description)
+The engine now supports multiple schedules side-by-side:
+
+```
+data/processed/
+├── acc1520-medical/
+│   ├── acc1520-medical.sqlite3
+│   ├── manifest.json
+│   └── acc1520-medical_codes.json
+├── acc1520-rural/
+│   ├── acc1520-rural.sqlite3
+│   ├── manifest.json
+│   └── acc1520-rural_codes.json
+└── gp-2024/
+    ├── gp-2024.sqlite3
+    ├── manifest.json
+    └── gp-2024_codes.json
 ```
 
-**Keyword similarity:** Jaccard index of token sets
-```python
-intersection / max(len(a), len(b))
-```
+Each schedule has:
+- Its own SQLite database
+- Its own ScheduleProfile
+- Its own embeddings
+- Independent versioning
 
-**Heuristic boosts** include:
-- Age-band detection (regex: `\b(\d{1,3})\s*[-–—]?\s*year\s*[-–—]?\s*old\b`)
-- CSC eligibility parsing
-- Nurse+GP joint consult detection
-- Laceration length extraction (`\b(\d+(?:\.\d+)?)\s*cm\b`)
-- Negation handling for fractures/amputations
-- Multi-site abrasion detection
-- Epistaxis with packing detection
+### Dynamic Profiling
 
-### Pricing Rules (Prototype)
+The LLM analysis step extracts schedule-specific characteristics:
 
-```python
-# Consultation codes: full value
-# Non-consult treatments: 100% for highest-cost, 50% for additional treatments
-# (if multiple injury sites detected)
-```
+1. **Document text** is extracted from PDF
+2. **LLM analyzes** the first 8000 characters
+3. **Profile is generated** with schedule type, dimensions, rules
+4. **Profile guides** query generation and constraint application
+
+This allows the same codebase to handle:
+- Urgent care schedules
+- Rural practitioner schedules with travel modifiers
+- GP consultation schedules
+- Specialist schedules
+- Hospital schedules
 
 ---
 
 ## Known Limitations
 
-1. **Constraint engine depth:** Current constraints are prototype-level, not a full ACC rule graph
+1. **Constraint engine depth:** Current constraints are prototype-level, not a full rule graph
 2. **Pricing rule granularity:** Same-visit pricing logic is simplified
 3. **Negation NLP:** Improved but still heuristic; formal NLP would strengthen this
-4. **Audit mode UI:** Could add model confidence and "kept/dropped by final model" badges
+4. **Schedule detection:** Profile generation depends on LLM; may need refinement for unusual schedules
 
 ---
 

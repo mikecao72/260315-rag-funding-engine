@@ -12,7 +12,7 @@ if str(SRC) not in sys.path:
 
 from rag_funding_engine.pipeline.recommend import recommend_codes  # noqa: E402
 
-DB_PATH = ROOT / "data" / "processed" / "acc1520.sqlite3"
+SCHEDULE_ID = "acc1520-medical"
 CODE_RE = re.compile(r"^[A-Za-z0-9\-]{2,}$")
 
 CASES = [
@@ -68,20 +68,24 @@ def sanity_checks(result: dict) -> list[str]:
 
 
 def main() -> int:
-    if not DB_PATH.exists():
-        print(f"ERROR: DB not found at {DB_PATH}")
+    from rag_funding_engine.pipeline.recommend import _get_db_path
+    db_path = _get_db_path(SCHEDULE_ID, ROOT / "data" / "processed")
+    
+    if not db_path.exists():
+        print(f"ERROR: DB not found at {db_path}")
         print("Run ingest first (e.g. POST /ingest) then re-run this smoke eval.")
         return 2
 
     print("RAG Funding Engine smoke eval")
-    print(f"DB: {DB_PATH}")
+    print(f"Schedule: {SCHEDULE_ID}")
+    print(f"DB: {db_path}")
     print(f"Cases: {len(CASES)}")
     print("-" * 72)
 
     failures = 0
     for idx, case in enumerate(CASES, start=1):
         result = recommend_codes(
-            db_path=DB_PATH,
+            schedule_id=SCHEDULE_ID,
             consult_text=case["consult_text"],
             consult_template=None,
             top_n=5,

@@ -4,10 +4,11 @@ _Last updated: 2026-03-14 (NZ)_
 
 ## Where to read first next session
 
-1. `IMPLEMENTATION_CHANGELOG_2026-03-14.md`
-2. `DETERMINISTIC_QUERY_WALKTHROUGH.md`
-3. `src/rag_funding_engine/pipeline/recommend.py`
-4. `mission-control/src/app/projects/rag-funding-engine/demo/page.tsx`
+1. `docs/ARCHITECTURE_V2.md` — **Generic multi-schedule platform architecture**
+2. `IMPLEMENTATION_CHANGELOG_2026-03-14.md`
+3. `DETERMINISTIC_QUERY_WALKTHROUGH.md`
+4. `src/rag_funding_engine/pipeline/recommend.py`
+5. `mission-control/src/app/projects/rag-funding-engine/demo/page.tsx`
 
 ## Current architecture (working)
 

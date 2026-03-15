@@ -13,7 +13,6 @@ def approx_equal(a: float, b: float, tol: float) -> bool:
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
-    db_path = root / "data" / "processed" / "acc1520.sqlite3"
     cases_path = root / "tests" / "regression_cases.json"
 
     cases = json.loads(cases_path.read_text())
@@ -22,10 +21,24 @@ def main() -> int:
     for case in cases:
         cid = case["id"]
         consult_text = case["input"]["consult_text"]
+        schedule_id = case["input"].get("schedule_id", "acc1520-medical")
         top_n = case["input"].get("top_n", 5)
         exp = case["expected"]
 
-        res = recommend_codes(db_path=db_path, consult_text=consult_text, consult_template=None, top_n=top_n)
+        res = recommend_codes(
+            schedule_id=schedule_id,
+            consult_text=consult_text,
+            consult_template=None,
+            top_n=top_n,
+        )
+        
+        # Handle error case (schedule not found)
+        if "error" in res:
+            failures += 1
+            print(f"[FAIL] {cid}")
+            print(f"  - {res['error']}")
+            continue
+        
         recs = res["recommendations"]
         codes = [r["code"] for r in recs]
         total = float(res["estimated_total_excl_gst"])

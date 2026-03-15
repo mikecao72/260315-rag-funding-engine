@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from pathlib import Path
 from typing import Iterable
 
 import numpy as np
@@ -65,37 +66,57 @@ def ensure_embedding_table(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS policy_chunk_embeddings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            schedule_version TEXT,
+            schedule_id TEXT,
             chunk_id INTEGER,
             embedding_json TEXT,
-            UNIQUE(schedule_version, chunk_id)
+            UNIQUE(schedule_id, chunk_id)
         )
         """
     )
     conn.commit()
 
 
-def index_policy_chunks(db_path: str, schedule_version: str = "ACC1520-v2", model: str = "text-embedding-3-small") -> int:
+def index_policy_chunks(db_path: str, schedule_id: str, model: str = "text-embedding-3-small") -> int:
+    """
+    Generate embeddings for policy chunks in the given schedule database.
+    
+    Args:
+        db_path: Path to SQLite database
+        schedule_id: Schedule identifier
+        model: OpenAI embedding model to use
+        
+    Returns:
+        Number of chunks indexed
+    """
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     ensure_embedding_table(conn)
 
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, chunk_text FROM policy_chunks WHERE schedule_version = ?",
-        (schedule_version,),
+        "SELECT id, chunk_text FROM policy_chunks WHERE schedule_id = ?",
+        (schedule_id,),
     )
     rows = cur.fetchall()
     texts = [r["chunk_text"] for r in rows]
     embeddings = embed_texts(texts, model=model)
 
-    cur.execute("DELETE FROM policy_chunk_embeddings WHERE schedule_version = ?", (schedule_version,))
+    cur.execute("DELETE FROM policy_chunk_embeddings WHERE schedule_id = ?", (schedule_id,))
     for r, emb in zip(rows, embeddings):
         cur.execute(
-            "INSERT INTO policy_chunk_embeddings(schedule_version, chunk_id, embedding_json) VALUES (?, ?, ?)",
-            (schedule_version, r["id"], json.dumps(emb)),
+            "INSERT INTO policy_chunk_embeddings(schedule_id, chunk_id, embedding_json) VALUES (?, ?, ?)",
+            (schedule_id, r["id"], json.dumps(emb)),
         )
 
     conn.commit()
     conn.close()
     return len(rows)
+
+
+def get_vector_store_path(schedule_id: str, base_dir: Path | None = None) -> Path:
+    """Get the path to the vector store/embeddings directory for a schedule."""
+    if base_dir is None:
+        # Default to data/processed/{schedule_id}/embeddings/
+        from rag_funding_engine.api.main import ROOT
+        base_dir = ROOT / "data" / "processed"
+    return base_dir / schedule_id / "embeddings"
