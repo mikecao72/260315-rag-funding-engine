@@ -48,21 +48,23 @@ ANALYZE_SCHEDULE_PROMPT = """You are analyzing a medical fee schedule document.
 DOCUMENT TEXT (first 8000 characters):
 {text}
 
-Analyze this schedule and respond in strict JSON format:
-{
+Analyze this schedule and respond with ONLY valid JSON. No markdown code blocks, no explanation, no text before or after the JSON.
+
+Required JSON format:
+{{
   "schedule_type": "rural",
   "description": "Rural practitioner schedule with travel modifiers",
   "key_dimensions": ["location", "travel_time", "mileage"],
   "unique_rules": ["Travel >20km bills separately"],
-  "query_patterns": ["{specialty} {location}", "travel {distance}"],
+  "query_patterns": ["{{specialty}} {{location}}", "travel {{distance}}"],
   "example_queries": ["GP rural clinic", "travel 45km"],
   "location_matters": true,
   "mileage_reimbursable": true,
   "after_hours_premium": false
-}
+}}
 
 Fields:
-- schedule_type: Category like "urgent_care", "rural", "gp", "specialist", "hospital"
+- schedule_type: Category like "urgent_care", "rural", "gp", "specialist", "hospital", "medical"
 - description: Brief summary of what this schedule covers
 - key_dimensions: List of factors that affect billing (location, time, age, etc.)
 - unique_rules: Specific billing rules mentioned in the document
@@ -71,7 +73,107 @@ Fields:
 - location_matters: Whether location/venue affects pricing
 - mileage_reimbursable: Whether travel distance is billable
 - after_hours_premium: Whether after-hours premiums apply
+
+IMPORTANT: Respond ONLY with the JSON object. No ```json markers, no explanations.
 """
+
+
+def extract_json_from_llm_response(response: str) -> dict:
+    """Extract and parse JSON from LLM response, handling various formats.
+    
+    Handles:
+    - Markdown code blocks (```json...```)
+    - Text before/after JSON
+    - Single quotes instead of double quotes
+    - Truncated or malformed JSON
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if not response or not response.strip():
+        raise ValueError("Empty response from LLM")
+    
+    response = response.strip()
+    logger.debug(f"Raw LLM response (first 1000 chars): {response[:1000]}")
+    logger.debug(f"Raw LLM response (last 500 chars): {response[-500:]}")
+    
+    # Try 1: Direct JSON parse
+    try:
+        return json.loads(response)
+    except json.JSONDecodeError as e:
+        logger.debug(f"Direct JSON parse failed: {e}")
+        pass
+    
+    # Try 2: Extract from markdown code blocks
+    markdown_patterns = [
+        r'```json\s*\n(.*?)\n```',  # ```json ... ```
+        r'```\s*\n(.*?)\n```',       # ``` ... ```
+        r'`(.*?)`',                   # `...`
+    ]
+    
+    for pattern in markdown_patterns:
+        matches = re.findall(pattern, response, re.DOTALL)
+        for match in matches:
+            try:
+                extracted = match.strip()
+                logger.debug(f"Trying markdown extraction: {extracted[:200]}")
+                return json.loads(extracted)
+            except json.JSONDecodeError:
+                continue
+    
+    # Try 3: Find JSON between first { and last }
+    try:
+        start_idx = response.find('{')
+        end_idx = response.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            json_str = response[start_idx:end_idx + 1]
+            logger.debug(f"Trying brace extraction: {json_str[:200]}...{json_str[-100:]}")
+            return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        logger.debug(f"Brace extraction failed: {e}")
+        pass
+    
+    # Try 4: Fix common issues - replace single quotes with double quotes
+    try:
+        # Replace single quotes with double quotes, but be careful with apostrophes
+        fixed = response.replace("'", '"')
+        # Try brace extraction again with fixed quotes
+        start_idx = fixed.find('{')
+        end_idx = fixed.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            json_str = fixed[start_idx:end_idx + 1]
+            logger.debug(f"Trying single-quote fix: {json_str[:200]}")
+            return json.loads(json_str)
+    except json.JSONDecodeError:
+        pass
+    
+    # Try 5: Look for JSON-like structure with regex and clean it
+    try:
+        # Find anything that looks like a JSON object
+        json_like = re.search(r'\{[\s\S]*\}', response)
+        if json_like:
+            json_str = json_like.group(0)
+            # Remove trailing commas before closing braces/brackets
+            json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+            logger.debug(f"Trying regex extraction with trailing comma fix: {json_str[:200]}")
+            return json.loads(json_str)
+    except json.JSONDecodeError:
+        pass
+    
+    # Log the full response for debugging when all methods fail
+    logger.error(f"All JSON extraction methods failed. Full response:\n{response}")
+    raise ValueError(f"Could not extract valid JSON from LLM response. Response preview: {response[:500]}")
+
+
+def validate_schedule_profile(profile: dict) -> tuple[bool, list[str]]:
+    """Validate that the schedule profile has all required fields.
+    
+    Returns:
+        tuple of (is_valid, list of missing fields)
+    """
+    required = ["schedule_type", "query_patterns", "key_dimensions"]
+    missing = [field for field in required if field not in profile]
+    return len(missing) == 0, missing
 
 
 def _get_openai_client():
@@ -85,64 +187,95 @@ def _get_openai_client():
         return None
 
 
-def _analyze_schedule_with_llm(text: str, model: str = "gpt-4o") -> ScheduleProfile:
-    """Use LLM to analyze schedule and generate profile."""
+def _create_generic_profile(reason: str = "Unknown") -> ScheduleProfile:
+    """Create a generic fallback profile."""
+    return ScheduleProfile(
+        schedule_type="generic",
+        description=f"Medical fee schedule (LLM analysis failed: {reason})",
+        key_dimensions=["procedure", "provider_type"],
+        unique_rules=[],
+        query_patterns=["{procedure}", "{provider_type} consultation"],
+        example_queries=["consultation", "procedure code"],
+        location_matters=False,
+        mileage_reimbursable=False,
+        after_hours_premium=False,
+    )
+
+
+def _analyze_schedule_with_llm(text: str, model: str = "gpt-4o", max_retries: int = 3) -> ScheduleProfile:
+    """Use LLM to analyze schedule and generate profile with retry logic."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     client = _get_openai_client()
     
     # Truncate text to avoid token limits
     truncated = text[:8000]
     
     if client is None:
-        # Fallback: create generic profile
-        return ScheduleProfile(
-            schedule_type="generic",
-            description="Generic medical fee schedule",
-            key_dimensions=["procedure", "provider_type"],
-            unique_rules=[],
-            query_patterns=["{procedure}", "{provider_type} consultation"],
-            example_queries=["consultation", "procedure code"],
-            location_matters=False,
-            mileage_reimbursable=False,
-            after_hours_premium=False,
-        )
+        logger.warning("No OpenAI client available, using generic profile")
+        return _create_generic_profile("No API key")
     
-    try:
-        resp = client.chat.completions.create(
-            model=model,
-            temperature=0,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": ANALYZE_SCHEDULE_PROMPT.format(text=truncated)},
-            ],
-        )
-        content = resp.choices[0].message.content
-        data = json.loads(content)
-        
-        return ScheduleProfile(
-            schedule_type=data.get("schedule_type", "generic"),
-            description=data.get("description", "Medical fee schedule"),
-            key_dimensions=data.get("key_dimensions", []),
-            unique_rules=data.get("unique_rules", []),
-            query_patterns=data.get("query_patterns", []),
-            example_queries=data.get("example_queries", []),
-            location_matters=data.get("location_matters", False),
-            mileage_reimbursable=data.get("mileage_reimbursable", False),
-            after_hours_premium=data.get("after_hours_premium", False),
-        )
-    except Exception as e:
-        # Fallback on error
-        print(f"LLM analysis failed: {e}. Using generic profile.")
-        return ScheduleProfile(
-            schedule_type="generic",
-            description="Medical fee schedule (LLM analysis failed)",
-            key_dimensions=["procedure", "provider_type"],
-            unique_rules=[],
-            query_patterns=["{procedure}", "{provider_type} consultation"],
-            example_queries=["consultation", "procedure code"],
-            location_matters=False,
-            mileage_reimbursable=False,
-            after_hours_premium=False,
-        )
+    # Retry loop
+    for attempt in range(max_retries):
+        try:
+            # Add stricter instruction on retries
+            prompt = ANALYZE_SCHEDULE_PROMPT.format(text=truncated)
+            if attempt > 0:
+                prompt += f"\n\nATTEMPT {attempt + 1}/{max_retries}: You MUST respond with ONLY valid JSON. No markdown, no explanations."
+            
+            resp = client.chat.completions.create(
+                model=model,
+                temperature=0,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": prompt},
+                ],
+            )
+            
+            content = resp.choices[0].message.content
+            
+            # Extract JSON using robust extraction
+            try:
+                data = extract_json_from_llm_response(content)
+                logger.debug(f"Successfully extracted JSON on attempt {attempt + 1}")
+            except ValueError as e:
+                logger.warning(f"JSON extraction failed on attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1:
+                    continue
+                raise
+            
+            # Validate the profile
+            is_valid, missing = validate_schedule_profile(data)
+            if not is_valid:
+                logger.warning(f"Profile validation failed on attempt {attempt + 1}. Missing fields: {missing}")
+                if attempt < max_retries - 1:
+                    continue
+                # Last attempt: use what we have, fill in defaults
+                logger.error(f"Using partial profile after {max_retries} failed attempts. Missing: {missing}")
+            
+            return ScheduleProfile(
+                schedule_type=data.get("schedule_type", "generic"),
+                description=data.get("description", "Medical fee schedule"),
+                key_dimensions=data.get("key_dimensions", []),
+                unique_rules=data.get("unique_rules", []),
+                query_patterns=data.get("query_patterns", []),
+                example_queries=data.get("example_queries", []),
+                location_matters=data.get("location_matters", False),
+                mileage_reimbursable=data.get("mileage_reimbursable", False),
+                after_hours_premium=data.get("after_hours_premium", False),
+            )
+            
+        except Exception as e:
+            logger.error(f"LLM analysis error on attempt {attempt + 1}: {e}")
+            if attempt < max_retries - 1:
+                continue
+            # Final attempt failed
+            print(f"LLM analysis failed after {max_retries} attempts: {e}. Using generic profile.")
+            return _create_generic_profile(str(e))
+    
+    # Should not reach here, but fallback just in case
+    return _create_generic_profile("Max retries exceeded")
 
 
 def sha256_file(path: Path) -> str:

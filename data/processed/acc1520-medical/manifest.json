@@ -1,0 +1,36 @@
+{
+  "schedule_id": "acc1520-medical",
+  "source": "/home/pi/clawd/projects/rag-funding-engine/data/raw/ACC1520-Med-pract-nurse-pract-and-nurses-costs-v2.pdf",
+  "source_hash": "85cf1f71bf63e260407c052d7f76cdbe48a4e48a4c64245eb6fe7b42944a0cfd",
+  "pages": 11,
+  "codes_parsed": 73,
+  "chunks_indexed": 37,
+  "profile": {
+    "schedule_type": "medical",
+    "description": "Medical practitioner, nurse, nurse practitioner and paramedic costs",
+    "key_dimensions": [
+      "age",
+      "community_services_card",
+      "treatment_type"
+    ],
+    "unique_rules": [
+      "Community Services Card holders have different rates"
+    ],
+    "query_patterns": [
+      "{specialty} consultation {age_group}",
+      "treatment {type}"
+    ],
+    "example_queries": [
+      "nurse consultation under 14",
+      "treatment of burn greater than 4cm\u00b2"
+    ],
+    "location_matters": false,
+    "mileage_reimbursable": true,
+    "after_hours_premium": false
+  },
+  "artifacts": {
+    "text_pages": "/home/pi/clawd/projects/rag-funding-engine/data/processed/acc1520-medical/acc1520-medical_text_pages.json",
+    "codes": "/home/pi/clawd/projects/rag-funding-engine/data/processed/acc1520-medical/acc1520-medical_codes.json",
+    "db": "/home/pi/clawd/projects/rag-funding-engine/data/processed/acc1520-medical/acc1520-medical.sqlite3"
+  }
+}
