@@ -21,6 +21,7 @@ class RecommendRequest(BaseModel):
     consult_template: dict | None = None
     schedule_id: str = "acc1520-medical"
     top_n: int = 5
+    gst_mode: str = "excl"  # "excl" | "incl" - controls which fee is returned as primary
 
 
 @app.get("/health")
@@ -89,6 +90,7 @@ def recommend(payload: RecommendRequest) -> dict:
         consult_template=payload.consult_template,
         base_dir=DEFAULT_OUT,
         top_n=payload.top_n,
+        gst_mode=payload.gst_mode,
     )
 
 

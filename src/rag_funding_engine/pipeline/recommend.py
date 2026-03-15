@@ -478,6 +478,7 @@ def recommend_codes(
     consult_template: dict[str, Any] | None,
     base_dir: Path | None = None,
     top_n: int = 5,
+    gst_mode: str = "excl",
 ) -> dict[str, Any]:
     """
     Recommend billing codes for a consultation.
@@ -488,6 +489,7 @@ def recommend_codes(
         consult_template: Optional structured template
         base_dir: Base directory for processed data
         top_n: Number of recommendations to return
+        gst_mode: "excl" or "incl" - controls which fee is returned as primary "fee" field
     """
     # Load profile for this schedule
     profile = _load_profile(schedule_id, base_dir)
@@ -569,6 +571,8 @@ def recommend_codes(
         {
             "code": c.code,
             "description": c.description,
+            "fee": c.fee_excl_gst if gst_mode == "excl" else c.fee_incl_gst,
+            "fee_gst": c.fee_incl_gst if gst_mode == "excl" else c.fee_excl_gst,
             "fee_excl_gst": c.fee_excl_gst,
             "fee_incl_gst": c.fee_incl_gst,
             "page": c.page,
@@ -623,6 +627,7 @@ def recommend_codes(
         "consult_facts": consult_facts,
         "schedule_id": schedule_id,
         "profile": profile,
+        "gst_mode": gst_mode,
         "recommendations": recs,
         "estimated_total_excl_gst": round(total_excl, 2),
         "estimated_total_incl_gst": round(total_incl, 2),
