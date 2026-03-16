@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
@@ -31,8 +31,8 @@ app.add_middleware(
 
 
 class RecommendRequest(BaseModel):
-    consult_text: str | None = None
-    consult_template: dict | None = None
+    consult_text: Optional[str] = None
+    consult_template: Optional[Dict] = None
     schedule_id: str = "acc1520-medical"
     top_n: int = 5
     gst_mode: str = "excl"  # "excl" | "incl" - controls which fee is returned as primary

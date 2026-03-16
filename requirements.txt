@@ -8,6 +8,7 @@ python-dotenv==1.0.1
 pdfplumber==0.11.4
 pypdf==5.1.0
 pandas==2.2.3
-numpy==2.1.3
+numpy>=1.24.0,<2.1
 orjson==3.10.12
 openai==1.61.1
+python-multipart>=0.0.6
