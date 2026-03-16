@@ -1,0 +1,442 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #09090b;
+    color: #d4d4d8;
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+/* ── Header ── */
+header {
+    padding: 1.25rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+header h1 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #f4f4f5;
+}
+
+.subtitle {
+    font-size: 0.8rem;
+    color: #71717a;
+    margin-top: 0.1rem;
+}
+
+nav {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.tab {
+    background: transparent;
+    color: #71717a;
+    border: none;
+    padding: 0.45rem 0.9rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.tab:hover {
+    color: #d4d4d8;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.tab.active {
+    color: #f4f4f5;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Main ── */
+main {
+    max-width: 1400px;
+    margin: 1.5rem auto;
+    padding: 0 1.5rem;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* ── Two-column layout ── */
+.recommend-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+    min-width: 0;
+}
+
+.recommend-layout > * {
+    min-width: 0;
+}
+
+/* ── Panel (glass card) ── */
+.panel {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 1rem;
+    padding: 1.25rem;
+}
+
+.panel-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: #71717a;
+}
+
+.panel-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #f4f4f5;
+    margin-top: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.panel-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.result-count {
+    font-size: 0.75rem;
+    color: #71717a;
+}
+
+/* ── Form controls ── */
+textarea {
+    width: 100%;
+    height: 380px;
+    resize: vertical;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    color: #f4f4f5;
+    outline: none;
+}
+
+textarea::placeholder {
+    color: #71717a;
+}
+
+textarea:focus {
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.input-controls {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.controls-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.control-group label {
+    font-size: 0.75rem;
+    color: #a1a1aa;
+}
+
+select,
+input[type="text"],
+input[type="file"] {
+    padding: 0.45rem 0.6rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    color: #f4f4f5;
+    outline: none;
+}
+
+select:focus,
+input[type="text"]:focus {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+input[type="range"] {
+    width: 100%;
+    accent-color: #a1a1aa;
+}
+
+button[type="button"],
+button[type="submit"] {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
+    color: #f4f4f5;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+
+button[type="button"]:hover,
+button[type="submit"]:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ── Results table ── */
+.table-wrap {
+    overflow: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
+}
+
+table {
+    width: 100%;
+    text-align: left;
+    font-size: 0.875rem;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+thead {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+th {
+    padding: 0.55rem 0.75rem;
+    font-weight: 500;
+    color: #a1a1aa;
+    font-size: 0.8rem;
+}
+
+th:nth-child(1) { width: 45%; }
+th:nth-child(2) { width: 22%; }
+th:nth-child(3) { width: 13%; }
+th:nth-child(4) { width: 20%; }
+
+td {
+    padding: 0.55rem 0.75rem;
+    vertical-align: top;
+}
+
+tbody tr {
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.empty-cell {
+    text-align: center;
+    padding: 2.5rem 0.75rem;
+    color: #52525b;
+}
+
+/* Code cell */
+.code-btn {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+    font-family: inherit;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+td {
+    overflow: hidden;
+}
+
+.code-name {
+    font-weight: 600;
+    color: #e4e4e7;
+}
+
+.code-desc {
+    font-size: 0.75rem;
+    color: #71717a;
+    margin-top: 0.15rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+}
+
+.code-toggle {
+    font-size: 0.68rem;
+    color: #52525b;
+    margin-top: 0.3rem;
+}
+
+/* Reasoning row */
+.reason-row td {
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    color: #a1a1aa;
+    background: rgba(255, 255, 255, 0.02);
+    border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Qty input */
+.qty-input {
+    width: 100%;
+    max-width: 4.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+    color: #f4f4f5;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.qty-input:focus {
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Grand total */
+.grand-total-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.75rem;
+}
+
+.grand-total {
+    border: 1px solid rgba(52, 211, 153, 0.2);
+    background: rgba(16, 185, 129, 0.1);
+    color: #a7f3d0;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.grand-total-amount {
+    font-weight: 600;
+}
+
+/* ── Schedule cards ── */
+.schedule-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.schedule-card h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #e4e4e7;
+}
+
+.schedule-card .schedule-meta {
+    font-size: 0.8rem;
+    color: #71717a;
+    margin-top: 0.2rem;
+}
+
+/* ── Status messages ── */
+.loading-row td {
+    text-align: center;
+    padding: 2rem 0.75rem;
+    color: #71717a;
+}
+
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #3f3f46;
+    border-top-color: #a1a1aa;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-left: 0.4rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.error-msg {
+    font-size: 0.85rem;
+    color: #fca5a5;
+    margin-top: 0.5rem;
+}
+
+.success-msg {
+    border: 1px solid rgba(52, 211, 153, 0.2);
+    background: rgba(16, 185, 129, 0.08);
+    color: #a7f3d0;
+    padding: 0.65rem 0.85rem;
+    border-radius: 0.5rem;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: #52525b;
+}
+
+/* ── Mobile ── */
+@media (max-width: 800px) {
+    header {
+        padding: 0.75rem 1rem;
+    }
+
+    main {
+        padding: 0 0.75rem;
+    }
+
+    .recommend-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .controls-row {
+        flex-direction: column;
+    }
+
+    textarea {
+        height: 240px;
+    }
+}

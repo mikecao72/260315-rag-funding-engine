@@ -10,6 +10,9 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from dotenv import load_dotenv
+load_dotenv(ROOT / ".env")
+
 from rag_funding_engine.pipeline.recommend import recommend_codes  # noqa: E402
 
 SCHEDULE_ID = "acc1520-medical"

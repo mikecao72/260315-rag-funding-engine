@@ -1,7 +1,13 @@
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
 from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from rag_funding_engine.pipeline.ingest_schedule import ingest_schedule, ScheduleProfile
@@ -12,8 +18,16 @@ ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_PDF = ROOT / "data" / "raw" / "ACC1520-Med-pract-nurse-pract-and-nurses-costs-v2.pdf"
 DEFAULT_OUT = ROOT / "data" / "processed"
 
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 app = FastAPI(title="RAG Funding Engine", version="0.3.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class RecommendRequest(BaseModel):
@@ -142,3 +156,12 @@ def get_schedule(schedule_id: str) -> dict:
         }
     except Exception as e:
         return {"error": f"Failed to load schedule: {e}"}
+
+
+@app.get("/")
+def index():
+    """Serve the frontend."""
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
