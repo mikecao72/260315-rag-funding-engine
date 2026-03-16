@@ -14,6 +14,16 @@ from rag_funding_engine.pipeline.semantic import cosine_similarity, embed_texts
 
 TOKEN_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9\-]{1,}")
 
+STOPWORDS = frozenset({
+    "the", "and", "for", "with", "from", "that", "this", "are", "was", "were",
+    "has", "had", "have", "but", "not", "per", "also", "known", "other", "any",
+    "all", "can", "may", "will", "been", "being", "its", "than", "then", "into",
+    "over", "under", "such", "when", "where", "who", "how", "which", "what",
+    "does", "did", "each", "some", "both", "their", "more", "less", "most",
+    "only", "about", "after", "before", "between", "during", "through", "without",
+    "including", "requiring", "necessary",
+})
+
 
 @dataclass
 class Candidate:
@@ -54,26 +64,31 @@ def _load_profile(schedule_id: str, base_dir: Path | None = None) -> dict[str, A
 
 
 def _tokens(text: str) -> set[str]:
-    return {t.lower() for t in TOKEN_RE.findall(text or "") if len(t) > 2}
+    return {t.lower() for t in TOKEN_RE.findall(text or "") if len(t) > 2 and t.lower() not in STOPWORDS}
 
 
 def _keyword_similarity(a: set[str], b: set[str]) -> float:
     if not a or not b:
         return 0.0
     inter = len(a & b)
-    return inter / max(1, len(a))
+    return inter / max(1, min(len(a), len(b)))
 
 
 def _extract_consult_facts(text: str, template: dict[str, Any] | None, profile: dict[str, Any]) -> dict[str, Any]:
-    """Extract consult facts using LLM or heuristic, guided by profile."""
+    """Extract consult facts and billing search queries using LLM, guided by profile.
+
+    Returns dict with keys: mode, facts, search_queries.
+    search_queries is a list of short medical-term phrases suitable for matching
+    against schedule code descriptions (e.g. "open wound closure", "shoulder dislocation").
+    """
     if template:
-        return {"mode": "template", "facts": template}
+        queries = [f"{v}" for v in template.values() if v]
+        return {"mode": "template", "facts": template, "search_queries": queries}
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        return {"mode": "heuristic", "facts": {"summary": text}}
+        return {"mode": "heuristic", "facts": {"summary": text}, "search_queries": []}
 
-    # Build prompt based on profile key_dimensions
     key_dims = profile.get("key_dimensions", ["injury_type", "body_site", "procedure", "severity"])
     dims_str = ", ".join(key_dims)
 
@@ -82,8 +97,24 @@ def _extract_consult_facts(text: str, template: dict[str, Any] | None, profile: 
 
         client = OpenAI(api_key=api_key)
         prompt = (
-            f"Extract consult billing-relevant facts as strict compact JSON with keys: {dims_str}. "
-            "If unknown use null."
+            "You are a medical billing analyst for the ACC1520 fee schedule (NZ accident compensation).\n"
+            f"Given clinical consultation notes, extract:\n"
+            f"1. \"facts\": billing-relevant facts as compact JSON with keys: {dims_str}. Use null if unknown.\n"
+            "2. \"search_queries\": a JSON array of 3-8 short search phrases (2-5 words each) "
+            "using EXACTLY the kind of language found in fee schedule code descriptions. Examples:\n"
+            "  - \"GP consultation\" (not \"orthopaedic consultation\" or \"saw the doctor\")\n"
+            "  - \"closure of wound\" (not \"open wound treatment\" or \"patient has a cut\")\n"
+            "  - \"burns or abrasions\" (not \"scraped knee\" or \"graze\")\n"
+            "  - \"dislocation of shoulder\" (not \"shoulder popped out\")\n"
+            "  - \"fractured clavicle\" (not \"broken collarbone\")\n"
+            "  - \"soft tissue injury\" (not \"muscle strain\")\n"
+            "  - \"wound cleaning dressing\" (not \"wound care\")\n"
+            "Generate one query per distinct billable item: the consultation itself, "
+            "each distinct injury requiring treatment (wound closure, abrasion dressing, "
+            "dislocation reduction, fracture immobilisation, etc). "
+            "If an investigation RULES OUT a condition (e.g. X-ray shows no fracture), "
+            "do NOT generate a query for that condition.\n"
+            "Return strict JSON with keys: \"facts\", \"search_queries\"."
         )
         resp = client.chat.completions.create(
             model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),
@@ -95,9 +126,13 @@ def _extract_consult_facts(text: str, template: dict[str, Any] | None, profile: 
             ],
         )
         payload = json.loads(resp.choices[0].message.content)
-        return {"mode": "llm", "facts": payload}
+        facts = payload.get("facts", payload)
+        queries = payload.get("search_queries", [])
+        if not isinstance(queries, list):
+            queries = []
+        return {"mode": "llm", "facts": facts, "search_queries": queries}
     except Exception:
-        return {"mode": "heuristic", "facts": {"summary": text}}
+        return {"mode": "heuristic", "facts": {"summary": text}, "search_queries": []}
 
 
 def _parse_age(text: str) -> int | None:
@@ -142,10 +177,13 @@ def _heuristic_boost(query_text: str, code: str, description: str, profile: dict
     nurse_gp_joint = ("nurse" in t and "gp" in t) and any(k in t for k in ["together", "jointly", "combined"])
 
     # ACC1520-specific heuristics (preserved for backward compatibility)
-    if code == "GP1" and age is not None and age >= 14 and not has_csc:
-        boost += 0.9
-        if any(k in t for k in ["urgent care", "clinic", "consult", "acc claim", "workplace"]):
-            boost += 0.3
+    # GP1 is the default adult consultation code — boost when age >= 14 OR age unknown (default adult)
+    if code == "GP1" and not has_csc:
+        if age is None or age >= 14:
+            boost += 0.9
+            if any(k in t for k in ["urgent care", "clinic", "consult", "acc claim", "workplace",
+                                     "assessment", "plan", "objective", "subjective"]):
+                boost += 0.3
 
     # Consultation routing for CSC-dependent teen in nurse+GP consult.
     if code == "GNCD" and nurse_gp_joint and dependent and age is not None and 14 <= age <= 17:
@@ -153,17 +191,21 @@ def _heuristic_boost(query_text: str, code: str, description: str, profile: dict
     if code in {"NUCD", "NNCD", "GNCS", "NUCS", "NNCS", "GPCD", "GPCS"} and nurse_gp_joint and dependent and age is not None and 14 <= age <= 17:
         boost -= 1.2
 
-    if code == "MW1" and any(k in t for k in ["laceration", "wound", "closure"]):
-        cm = _cm_length(t)
+    # Wound closure codes: boost when open wound / laceration is documented
+    wound_present = any(k in t for k in ["open wound", "laceration", "wound closure", "wound", "sutures"])
+    cm = _cm_length(t)
+
+    if code == "MW1" and wound_present:
         if cm is not None and cm < 2:
             boost += 1.2
+        elif cm is None:
+            boost += 0.6  # wound present but size unknown — surface both MW1 and MW2
 
-    if code == "MW2" and any(k in t for k in ["laceration", "wound", "sutures", "closure"]):
-        cm = _cm_length(t)
+    if code == "MW2" and wound_present:
         if cm is not None and 2 <= cm <= 7:
             boost += 1.2
         elif cm is None:
-            boost += 0.5
+            boost += 0.6  # wound present but size unknown
 
     if code == "MW3" and any(k in t for k in ["laceration", "wound", "closure"]):
         cm = _cm_length(t)
@@ -179,6 +221,12 @@ def _heuristic_boost(query_text: str, code: str, description: str, profile: dict
         boost += 2.6
     if code in {"MW1", "MW2", "MW3"} and multi_site_abrasion:
         boost -= 1.0
+
+    # Abrasion treatment codes: MB3 (single site ≤4cm²), MB4 (single site >4cm²), MB5 (multi-site)
+    if code == "MB3" and any(k in t for k in ["abrasion", "graze", "road rash"]):
+        boost += 0.6
+    if code == "MB4" and any(k in t for k in ["abrasion", "graze", "road rash"]):
+        boost += 0.5
 
     # Epistaxis with nasal packing should strongly favor MM8.
     if code == "MM8" and "epistaxis" in t and any(k in t for k in ["nasal packing", "packing", "pack"]):
@@ -367,7 +415,11 @@ def _final_reasoning_review(
     recs: list[dict[str, Any]],
     profile: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Optional final LLM adjudication step over candidate recommendations."""
+    """LLM annotation step: adds clinical reasoning to each candidate.
+
+    Does NOT filter codes — all candidates are returned with added reasoning.
+    The clinician decides which codes to bill.
+    """
     if not recs:
         return recs
 
@@ -383,12 +435,16 @@ def _final_reasoning_review(
 
         client = OpenAI(api_key=api_key)
         prompt = (
-            f"You are the final clinical billing adjudicator for {schedule_type} schedule outputs. "
-            "Given consult input, extracted facts, and candidate codes, return STRICT JSON with key 'final_recommendations'. "
-            "Each item must include: code, keep (boolean), reason (short). "
-            "Rules: respect explicit negations in input (e.g. 'no fracture', 'no amputation'); "
-            "prefer specific clinically-supported items; avoid mutually incompatible/same-family duplicates unless clearly justified; "
-            "retain at most 6 final codes. Do not invent codes not present in candidates."
+            f"You are a clinical billing advisor for the ACC1520 {schedule_type} fee schedule.\n"
+            "Given consult input, extracted facts, and candidate billing codes, provide clinical reasoning for each.\n"
+            "Return STRICT JSON with key 'annotations' — an array with one entry per candidate code.\n"
+            "Each entry must include: code, relevance ('high', 'medium', or 'low'), reason (1-2 sentence explanation).\n\n"
+            "Guidelines:\n"
+            "- 'high': directly supported by documented injuries/treatments\n"
+            "- 'medium': plausibly relevant but not explicitly documented\n"
+            "- 'low': unlikely to be appropriate (e.g. negated findings, wrong body site)\n"
+            "- Note any negations (e.g. 'no fracture' should mark fracture codes as low)\n"
+            "- Do not omit any candidate — annotate ALL of them.\n"
         )
 
         payload = {
@@ -417,28 +473,23 @@ def _final_reasoning_review(
 
         content = resp.choices[0].message.content or "{}"
         parsed = json.loads(content)
-        final = parsed.get("final_recommendations") or []
-        if not isinstance(final, list):
+        annotations = parsed.get("annotations") or []
+        if not isinstance(annotations, list):
             return recs
 
-        by_code = {str(r.get("code")): r for r in recs}
-        reviewed: list[dict[str, Any]] = []
-        for item in final:
-            if not isinstance(item, dict):
-                continue
-            code = str(item.get("code") or "")
-            keep = bool(item.get("keep"))
-            if not keep or code not in by_code:
-                continue
-            rr = dict(by_code[code])
-            llm_reason = str(item.get("reason") or "").strip()
-            if llm_reason:
-                rr["llm_reason"] = llm_reason
-            reviewed.append(rr)
-            if len(reviewed) >= 6:
-                break
+        # Merge annotations back into recs
+        by_code = {str(a.get("code")): a for a in annotations if isinstance(a, dict)}
+        for r in recs:
+            ann = by_code.get(str(r.get("code")))
+            if ann:
+                r["llm_reason"] = str(ann.get("reason") or "").strip()
+                r["relevance"] = str(ann.get("relevance") or "medium").strip()
 
-        return reviewed or recs
+        # Sort: high relevance first, then medium, then low
+        relevance_order = {"high": 0, "medium": 1, "low": 2}
+        recs.sort(key=lambda r: (relevance_order.get(r.get("relevance", "medium"), 1), -r.get("match_score", 0)))
+
+        return recs
     except Exception:
         return recs
 
@@ -524,9 +575,13 @@ def recommend_codes(
 
     query_text = f"{consult_text or ''} {template_text}".strip()
     consult_facts = _extract_consult_facts(consult_text or "", consult_template, profile)
-    query_tokens = _tokens(query_text)
 
-    candidates: list[Candidate] = []
+    # Use LLM-generated search queries for scoring instead of raw SOAP text
+    search_queries = consult_facts.get("search_queries", [])
+
+    # Build semantic embeddings for search queries and code descriptions
+    code_descs = []
+    code_rows = []
     no_csc = _has_no_csc(query_text)
     for r in rows:
         code = r["code"]
@@ -537,11 +592,50 @@ def recommend_codes(
             continue
         if code.startswith("MW4") and not _has_positive_amputation(query_text):
             continue
+        code_descs.append(f"{code} {desc}")
+        code_rows.append(r)
 
+    # Embed search queries and code descriptions for semantic scoring
+    semantic_scores: dict[int, float] = {}
+    if search_queries:
+        try:
+            all_texts = search_queries + code_descs
+            all_embs = embed_texts(all_texts)
+            query_embs = all_embs[:len(search_queries)]
+            desc_embs = all_embs[len(search_queries):]
+
+            for i in range(len(code_rows)):
+                best_sem = 0.0
+                for qe in query_embs:
+                    s = cosine_similarity(qe, desc_embs[i])
+                    if s > best_sem:
+                        best_sem = s
+                semantic_scores[i] = best_sem
+        except Exception:
+            pass
+
+    candidates: list[Candidate] = []
+    for i, r in enumerate(code_rows):
+        code = r["code"]
+        desc = r["description"]
         desc_tokens = _tokens(desc)
-        keyword_score = _keyword_similarity(query_tokens, desc_tokens)
-        score = keyword_score + _heuristic_boost(query_text, code, desc, profile)
-        if score <= 0.05:
+
+        # Keyword score: best match across LLM search queries
+        best_kw_score = 0.0
+        if search_queries:
+            for sq in search_queries:
+                sq_tokens = _tokens(sq)
+                s = _keyword_similarity(sq_tokens, desc_tokens)
+                if s > best_kw_score:
+                    best_kw_score = s
+        else:
+            query_tokens = _tokens(query_text)
+            best_kw_score = _keyword_similarity(query_tokens, desc_tokens)
+
+        # Combine keyword + semantic + heuristic
+        sem_score = semantic_scores.get(i, 0.0)
+        combined = (best_kw_score * 0.4) + (sem_score * 0.6) + _heuristic_boost(query_text, code, desc, profile)
+        if combined <= 0.05:
             continue
         candidates.append(
             Candidate(
@@ -550,20 +644,34 @@ def recommend_codes(
                 fee_excl_gst=r["fee_excl_gst"],
                 fee_incl_gst=r["fee_incl_gst"],
                 page=r["page"],
-                score=score,
+                score=combined,
             )
         )
 
-    # Lightweight compatibility filter: avoid picking multiple near-duplicate rows unless strong score.
+    # Split candidates into consultation codes and treatment codes.
+    # Pick best consultation, then fill remaining slots with diverse treatments.
     candidates.sort(key=lambda c: (c.score, c.fee_excl_gst or 0.0), reverse=True)
+
+    consult_candidates = [c for c in candidates if _is_consultation_code(c.code)]
+    treatment_candidates = [c for c in candidates if not _is_consultation_code(c.code)]
+
     selected: list[Candidate] = []
-    seen_prefixes: set[str] = set()
-    for c in candidates:
+
+    # Pick the single best consultation code
+    if consult_candidates:
+        selected.append(consult_candidates[0])
+
+    # Fill remaining slots with treatment codes.
+    # Allow up to 2 codes per prefix family to surface alternatives (e.g. MW1 vs MW2).
+    # The LLM annotator will mark irrelevant ones — clinician makes final selection.
+    prefix_count: dict[str, int] = {}
+    for c in treatment_candidates:
         prefix = re.sub(r"\d+$", "", c.code)
-        if prefix in seen_prefixes and c.score < 0.95:
+        count = prefix_count.get(prefix, 0)
+        if count >= 2 and c.score < 0.95:
             continue
         selected.append(c)
-        seen_prefixes.add(prefix)
+        prefix_count[prefix] = count + 1
         if len(selected) >= top_n:
             break
 
@@ -604,7 +712,9 @@ def recommend_codes(
     total_excl = sum((r.get("line_total_excl_gst") or 0.0) for r in recs)
     total_incl = sum(((r.get("fee_incl_gst") or 0.0) * (r.get("pricing_multiplier") or 1.0)) for r in recs)
 
-    evidence_chunks = _fetch_semantic_chunks(cur, schedule_id, query_text, top_n=3)
+    # Use search queries for semantic evidence lookup
+    semantic_query = " ".join(search_queries) if search_queries else query_text
+    evidence_chunks = _fetch_semantic_chunks(cur, schedule_id, semantic_query, top_n=3)
     if not evidence_chunks:
         # Fallback if semantic index not built yet.
         cur.execute(
@@ -612,9 +722,10 @@ def recommend_codes(
             (schedule_id,),
         )
         chunks = cur.fetchall()
+        fallback_tokens = _tokens(semantic_query)
         scored = []
         for ch in chunks:
-            s = _keyword_similarity(query_tokens, _tokens(ch["chunk_text"]))
+            s = _keyword_similarity(fallback_tokens, _tokens(ch["chunk_text"]))
             if s > 0:
                 scored.append((s, ch["page"], ch["chunk_text"][:300]))
         scored.sort(reverse=True)

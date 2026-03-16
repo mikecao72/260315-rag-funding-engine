@@ -1,12 +1,15 @@
+import os
+import secrets
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -15,6 +18,22 @@ from rag_funding_engine.pipeline.recommend import recommend_codes
 
 
 ROOT = Path(__file__).resolve().parents[3]
+APP_USERNAME = os.getenv("APP_USERNAME", "admin")
+APP_PASSWORD = os.getenv("APP_PASSWORD", "changeme")
+
+security = HTTPBasic()
+
+
+def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = secrets.compare_digest(credentials.username, APP_USERNAME)
+    correct_password = secrets.compare_digest(credentials.password, APP_PASSWORD)
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 DEFAULT_PDF = ROOT / "data" / "raw" / "ACC1520-Med-pract-nurse-pract-and-nurses-costs-v2.pdf"
 DEFAULT_OUT = ROOT / "data" / "processed"
 
@@ -48,6 +67,7 @@ def ingest(
     pdf: UploadFile = File(...),
     schedule_id: str = Form(...),
     llm_model: str = Form("gpt-4o"),
+    _user: str = Depends(verify_credentials),
 ) -> dict:
     """
     Ingest any schedule document.
@@ -93,7 +113,7 @@ def ingest(
 
 
 @app.post("/recommend")
-def recommend(payload: RecommendRequest) -> dict:
+def recommend(payload: RecommendRequest, _user: str = Depends(verify_credentials)) -> dict:
     """
     Recommend billing codes for a consultation.
     Loads schedule's profile → generates queries → searches → returns codes.
@@ -109,7 +129,7 @@ def recommend(payload: RecommendRequest) -> dict:
 
 
 @app.get("/schedules")
-def list_schedules() -> dict:
+def list_schedules(_user: str = Depends(verify_credentials)) -> dict:
     """List all ingested schedules."""
     schedules = []
     
@@ -135,7 +155,7 @@ def list_schedules() -> dict:
 
 
 @app.get("/schedules/{schedule_id}")
-def get_schedule(schedule_id: str) -> dict:
+def get_schedule(schedule_id: str, _user: str = Depends(verify_credentials)) -> dict:
     """Get details of a specific schedule."""
     import json
     

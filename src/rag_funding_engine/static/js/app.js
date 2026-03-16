@@ -1,6 +1,60 @@
 (function () {
     "use strict";
 
+    // ── Auth ──
+    var authToken = sessionStorage.getItem("authToken") || "";
+
+    function authHeaders() {
+        return { "Authorization": "Basic " + authToken };
+    }
+
+    function showLogin() {
+        document.getElementById("login-overlay").style.display = "flex";
+        document.getElementById("app-content").style.display = "none";
+    }
+
+    function hideLogin() {
+        document.getElementById("login-overlay").style.display = "none";
+        document.getElementById("app-content").style.display = "block";
+    }
+
+    document.getElementById("login-form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var user = document.getElementById("login-user").value;
+        var pass = document.getElementById("login-pass").value;
+        authToken = btoa(user + ":" + pass);
+
+        // Test credentials against /schedules
+        fetch("/schedules", { headers: authHeaders() })
+            .then(function (r) {
+                if (r.status === 401) {
+                    document.getElementById("login-error").textContent = "Invalid username or password";
+                    document.getElementById("login-error").hidden = false;
+                    return;
+                }
+                sessionStorage.setItem("authToken", authToken);
+                document.getElementById("login-error").hidden = true;
+                hideLogin();
+                return r.json();
+            })
+            .then(function (data) {
+                if (data) {
+                    populateDropdown(data.schedules || []);
+                    renderSchedulesList(data.schedules || []);
+                }
+            })
+            .catch(function () {
+                document.getElementById("login-error").textContent = "Connection failed";
+                document.getElementById("login-error").hidden = false;
+            });
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", function () {
+        authToken = "";
+        sessionStorage.removeItem("authToken");
+        showLogin();
+    });
+
     // ── State ──
     var results = [];
     var quantities = {};
@@ -29,7 +83,7 @@
 
     // ── Load schedules ──
     function loadSchedules() {
-        fetch("/schedules")
+        fetch("/schedules", { headers: authHeaders() })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 populateDropdown(data.schedules || []);
@@ -91,7 +145,7 @@
 
         fetch("/recommend", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "Authorization": "Basic " + authToken },
             body: JSON.stringify({
                 consult_text: consultText,
                 schedule_id: scheduleId,
@@ -163,7 +217,7 @@
                     '</button>' +
                 '</td>' +
                 '<td>$' + unit.toFixed(2) + '</td>' +
-                '<td><input type="number" class="qty-input" data-code="' + esc(row.code) + '" min="1" value="' + qty + '"></td>' +
+                '<td><input type="number" class="qty-input" data-code="' + esc(row.code) + '" min="0.1" step="0.1" value="' + qty + '"></td>' +
                 '<td>$' + total.toFixed(2) + '</td>' +
             '</tr>';
 
@@ -190,7 +244,7 @@
         body.querySelectorAll(".qty-input").forEach(function (inp) {
             inp.addEventListener("change", function () {
                 var code = inp.dataset.code;
-                quantities[code] = Math.max(1, parseInt(inp.value, 10) || 1);
+                quantities[code] = Math.max(0.1, parseFloat(inp.value) || 1);
                 renderTable();
             });
         });
@@ -227,7 +281,7 @@
         document.getElementById("ingest-results").innerHTML =
             '<div style="margin-top:0.75rem;color:#71717a">Ingesting schedule (this may take a minute)<span class="spinner"></span></div>';
 
-        fetch("/ingest", { method: "POST", body: fd })
+        fetch("/ingest", { method: "POST", body: fd, headers: authHeaders() })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 btn.disabled = false;
@@ -259,5 +313,27 @@
     }
 
     // ── Init ──
-    loadSchedules();
+    if (authToken) {
+        // Validate stored credentials
+        fetch("/schedules", { headers: authHeaders() })
+            .then(function (r) {
+                if (r.status === 401) {
+                    sessionStorage.removeItem("authToken");
+                    authToken = "";
+                    showLogin();
+                    return;
+                }
+                hideLogin();
+                return r.json();
+            })
+            .then(function (data) {
+                if (data) {
+                    populateDropdown(data.schedules || []);
+                    renderSchedulesList(data.schedules || []);
+                }
+            })
+            .catch(function () { showLogin(); });
+    } else {
+        showLogin();
+    }
 })();
