@@ -22,14 +22,14 @@
   },
   {
     "code": "NCCS",
-    "description": "Nurse consultation â€“ Community Services Card holder",
+    "description": "Nurse consultation – Community Services Card holder",
     "fee_excl_gst": 32.79,
     "fee_incl_gst": 37.71,
     "page": 1
   },
   {
     "code": "NCCD",
-    "description": "Nurse consultation â€“ dependant of Community Services Card holder (14 -17 years)",
+    "description": "Nurse consultation – dependant of Community Services Card holder (14 -17 years)",
     "fee_excl_gst": 38.98,
     "fee_incl_gst": 44.83,
     "page": 1
@@ -50,70 +50,70 @@
   },
   {
     "code": "NUCS",
-    "description": "Nurse practitioner consultation â€“ Community Services Card holder",
+    "description": "Nurse practitioner consultation – Community Services Card holder",
     "fee_excl_gst": 58.27,
     "fee_incl_gst": 67.01,
     "page": 1
   },
   {
     "code": "NUCD",
-    "description": "Nurse practitioner consultation â€“ Dependant of Community Services Card holder (14 â€“ 17 years) Combined",
+    "description": "Nurse practitioner consultation – Dependant of Community Services Card holder (14 – 17 years) Combined",
     "fee_excl_gst": 63.95,
     "fee_incl_gst": 73.54,
     "page": 1
   },
   {
     "code": "GPN",
-    "description": "Nurse/GP consultation â€“ if the client is 14 years old or over",
+    "description": "Nurse/GP consultation – if the client is 14 years old or over",
     "fee_excl_gst": 38.94,
     "fee_incl_gst": 44.78,
     "page": 1
   },
   {
     "code": "GN14",
-    "description": "Nurse/GP consultation â€“ if the client is under 14 years old",
+    "description": "Nurse/GP consultation – if the client is under 14 years old",
     "fee_excl_gst": 66.64,
     "fee_incl_gst": 76.64,
     "page": 1
   },
   {
     "code": "GNCS",
-    "description": "Nurse/GP consultation â€“ Community Services Card holder",
+    "description": "Nurse/GP consultation – Community Services Card holder",
     "fee_excl_gst": 62.62,
     "fee_incl_gst": 72.01,
     "page": 2
   },
   {
     "code": "GNCD",
-    "description": "Nurse/GP consultation â€“ dependant of Community Services Card holder (14 -17 years)",
+    "description": "Nurse/GP consultation – dependant of Community Services Card holder (14 -17 years)",
     "fee_excl_gst": 68.43,
     "fee_incl_gst": 78.69,
     "page": 2
   },
   {
     "code": "NN1",
-    "description": "Nurse/Nurse Practitioner consultation â€“ if the client is 14 years old or over",
+    "description": "Nurse/Nurse Practitioner consultation – if the client is 14 years old or over",
     "fee_excl_gst": 33.1,
     "fee_incl_gst": 38.07,
     "page": 2
   },
   {
     "code": "NN14",
-    "description": "Nurse/Nurse Practitioner consultation â€“ if the client under 14 years old",
+    "description": "Nurse/Nurse Practitioner consultation – if the client under 14 years old",
     "fee_excl_gst": 61.18,
     "fee_incl_gst": 70.36,
     "page": 2
   },
   {
     "code": "NNCS",
-    "description": "Nurse/Nurse Practitioner consultation â€“ Community Services Card holder",
+    "description": "Nurse/Nurse Practitioner consultation – Community Services Card holder",
     "fee_excl_gst": 57.42,
     "fee_incl_gst": 66.03,
     "page": 2
   },
   {
     "code": "NNCD",
-    "description": "Nurse/Nurse Practitioner consultation â€“ dependant of Community Services Card holder (14 -17 years) Paramedics",
+    "description": "Nurse/Nurse Practitioner consultation – dependant of Community Services Card holder (14 -17 years) Paramedics",
     "fee_excl_gst": 62.87,
     "fee_incl_gst": 72.3,
     "page": 2
@@ -134,28 +134,28 @@
   },
   {
     "code": "PMCS",
-    "description": "Paramedic consultation â€“ Community Services Card holder",
+    "description": "Paramedic consultation – Community Services Card holder",
     "fee_excl_gst": 31.27,
     "fee_incl_gst": 35.96,
     "page": 2
   },
   {
     "code": "PMCD",
-    "description": "Paramedic consultation â€“ dependant of Community Services Card holder (14 -17 years) Medical practitioners",
+    "description": "Paramedic consultation – dependant of Community Services Card holder (14 -17 years) Medical practitioners",
     "fee_excl_gst": 37.18,
     "fee_incl_gst": 42.76,
     "page": 2
   },
   {
     "code": "GP1",
-    "description": "GP consultation â€“ if the client is 14 years old or over (also known as CON)",
+    "description": "GP consultation – if the client is 14 years old or over (also known as CON)",
     "fee_excl_gst": 35.77,
     "fee_incl_gst": 41.14,
     "page": 2
   },
   {
     "code": "GP14",
-    "description": "GP consultation â€“ if the client is under 14 years old",
+    "description": "GP consultation – if the client is under 14 years old",
     "fee_excl_gst": 63.61,
     "fee_incl_gst": 73.15,
     "page": 2
@@ -169,7 +169,7 @@
   },
   {
     "code": "GPCD",
-    "description": "GP consultation â€“ dependant of Community Services Card holder (14 -17 years)",
+    "description": "GP consultation – dependant of Community Services Card holder (14 -17 years)",
     "fee_excl_gst": 65.4,
     "fee_incl_gst": 75.21,
     "page": 3
@@ -190,35 +190,35 @@
   },
   {
     "code": "MB1",
-    "description": "Treatment of burn less than 4cmÂ²",
+    "description": "Treatment of burn less than 4cm²",
     "fee_excl_gst": 34.96,
     "fee_incl_gst": 40.2,
     "page": 3
   },
   {
     "code": "MB2",
-    "description": "Treatment of burn at a single site greater than 4cmÂ²",
+    "description": "Treatment of burn at a single site greater than 4cm²",
     "fee_excl_gst": 68.85,
     "fee_incl_gst": 79.18,
     "page": 3
   },
   {
     "code": "MB3",
-    "description": "Treatment of significant abrasions less than 4cmÂ² at a single site",
+    "description": "Treatment of significant abrasions less than 4cm² at a single site",
     "fee_excl_gst": 34.97,
     "fee_incl_gst": 40.22,
     "page": 3
   },
   {
     "code": "MB4",
-    "description": "Treatment of significant abrasions greater than 4cmÂ² at a single site",
+    "description": "Treatment of significant abrasions greater than 4cm² at a single site",
     "fee_excl_gst": 68.85,
     "fee_incl_gst": 79.18,
     "page": 3
   },
   {
     "code": "MB5",
-    "description": "Significant burns or abrasions (not including fractures) at multiple sites (greater than 4cmÂ²): necessary wound cleaning, preparation, and dressing Dislocation",
+    "description": "Significant burns or abrasions (not including fractures) at multiple sites (greater than 4cm²): necessary wound cleaning, preparation, and dressing Dislocation",
     "fee_excl_gst": 100.31,
     "fee_incl_gst": 115.36,
     "page": 3
@@ -498,7 +498,7 @@
   },
   {
     "code": "EAR1",
-    "description": "Ear/Aural Toileting by microscope â€“ Ear Nurse Specialist",
+    "description": "Ear/Aural Toileting by microscope – Ear Nurse Specialist",
     "fee_excl_gst": 46.55,
     "fee_incl_gst": 53.53,
     "page": 7

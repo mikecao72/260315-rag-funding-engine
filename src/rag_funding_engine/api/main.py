@@ -34,8 +34,9 @@ class RecommendRequest(BaseModel):
     consult_text: str | None = None
     consult_template: dict | None = None
     schedule_id: str = "acc1520-medical"
-    top_n: int = 5
+    top_n: int = 10
     gst_mode: str = "excl"  # "excl" | "incl" - controls which fee is returned as primary
+    min_confidence: float = 0.1  # Confidence threshold for LLM code selection (0.0-1.0)
 
 
 @app.get("/health")
@@ -105,6 +106,7 @@ def recommend(payload: RecommendRequest) -> dict:
         base_dir=DEFAULT_OUT,
         top_n=payload.top_n,
         gst_mode=payload.gst_mode,
+        min_confidence=payload.min_confidence,
     )
 
 
@@ -156,6 +158,86 @@ def get_schedule(schedule_id: str) -> dict:
         }
     except Exception as e:
         return {"error": f"Failed to load schedule: {e}"}
+
+
+@app.get("/db/{schedule_id}/tables")
+def db_tables(schedule_id: str) -> dict:
+    """List all tables and their schemas in a schedule's SQLite database."""
+    import sqlite3
+
+    db_path = DEFAULT_OUT / schedule_id / f"{schedule_id}.sqlite3"
+    if not db_path.exists():
+        return {"error": f"Database not found: {schedule_id}"}
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+    table_names = [r["name"] for r in cur.fetchall()]
+
+    tables = []
+    for name in table_names:
+        cur.execute(f"PRAGMA table_info([{name}])")
+        columns = [
+            {"cid": r["cid"], "name": r["name"], "type": r["type"],
+             "notnull": bool(r["notnull"]), "pk": bool(r["pk"])}
+            for r in cur.fetchall()
+        ]
+        cur.execute(f"SELECT COUNT(*) as cnt FROM [{name}]")
+        row_count = cur.fetchone()["cnt"]
+        tables.append({"name": name, "columns": columns, "row_count": row_count})
+
+    conn.close()
+    return {"schedule_id": schedule_id, "tables": tables}
+
+
+@app.get("/db/{schedule_id}/tables/{table_name}")
+def db_table_rows(schedule_id: str, table_name: str, limit: int = 100, offset: int = 0) -> dict:
+    """Return rows from a specific table in a schedule's SQLite database."""
+    import sqlite3
+
+    db_path = DEFAULT_OUT / schedule_id / f"{schedule_id}.sqlite3"
+    if not db_path.exists():
+        return {"error": f"Database not found: {schedule_id}"}
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # Validate table exists
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+    if not cur.fetchone():
+        conn.close()
+        return {"error": f"Table not found: {table_name}"}
+
+    cur.execute(f"PRAGMA table_info([{table_name}])")
+    columns = [r["name"] for r in cur.fetchall()]
+
+    cur.execute(f"SELECT COUNT(*) as cnt FROM [{table_name}]")
+    total = cur.fetchone()["cnt"]
+
+    safe_limit = min(max(1, limit), 500)
+    safe_offset = max(0, offset)
+    cur.execute(f"SELECT * FROM [{table_name}] LIMIT ? OFFSET ?", (safe_limit, safe_offset))
+    rows = [dict(r) for r in cur.fetchall()]
+
+    # Truncate very long fields for display (e.g. embedding_json)
+    for row in rows:
+        for k, v in row.items():
+            if isinstance(v, str) and len(v) > 500:
+                row[k] = v[:500] + "... (" + str(len(v)) + " chars)"
+
+    conn.close()
+    return {
+        "schedule_id": schedule_id,
+        "table": table_name,
+        "columns": columns,
+        "rows": rows,
+        "total": total,
+        "limit": safe_limit,
+        "offset": safe_offset,
+    }
 
 
 @app.get("/")

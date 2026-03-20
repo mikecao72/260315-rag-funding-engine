@@ -278,6 +278,98 @@ def _analyze_schedule_with_llm(text: str, model: str = "gpt-4o", max_retries: in
     return _create_generic_profile("Max retries exceeded")
 
 
+GUIDANCE_PROMPT = """You are analyzing a medical fee schedule to generate instructions for an AI billing code selector.
+
+DOCUMENT TEXT (first 8000 chars):
+{text}
+
+PARSED CODES FROM THIS SCHEDULE:
+{codes_table}
+
+SCHEDULE PROFILE:
+{profile}
+
+Generate guidance as STRICT JSON with these keys:
+- document_scope: What this schedule covers, its intended use environment, and what is OUT OF SCOPE
+- code_groupings: Array of {{"codes": "comma-separated codes", "category": "category name", "description": "when to use"}} grouping related codes and explaining when each group applies
+- selection_rules: Array of specific rules the code selector must follow when choosing codes from this schedule
+
+Focus on:
+- Which codes are consultation codes vs procedure/treatment codes
+- How to select the right consultation code (provider type, age, CSC status)
+- When procedure codes should accompany consultation codes
+- Any mutual exclusivity between codes
+- Size/severity thresholds that determine which code in a family to pick
+
+IMPORTANT: Respond with ONLY valid JSON. No markdown code blocks, no explanation.
+"""
+
+
+_DEFAULT_GUIDANCE = {
+    "document_scope": "Medical fee schedule (guidance generation unavailable)",
+    "code_groupings": [],
+    "selection_rules": [],
+}
+
+
+def _generate_schedule_guidance(
+    full_text: str,
+    code_rows: list[dict],
+    profile: ScheduleProfile,
+    model: str,
+) -> dict:
+    """Generate schedule guidance for the recommendation LLM via a second LLM call.
+
+    Returns a dict with keys: document_scope, code_groupings, selection_rules.
+    Falls back to a minimal default if the LLM is unavailable or fails.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    client = _get_openai_client()
+    if client is None:
+        logger.warning("No OpenAI client available, using default schedule guidance")
+        return dict(_DEFAULT_GUIDANCE)
+
+    # Build a codes table with code + description only (no fees)
+    codes_table_lines = [f"{row['code']}  {row['description']}" for row in code_rows]
+    codes_table = "\n".join(codes_table_lines)
+
+    truncated = full_text[:8000]
+    profile_str = json.dumps(asdict(profile), indent=2)
+
+    prompt = GUIDANCE_PROMPT.format(
+        text=truncated,
+        codes_table=codes_table,
+        profile=profile_str,
+    )
+
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            temperature=0,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": prompt},
+            ],
+        )
+        content = resp.choices[0].message.content
+        data = extract_json_from_llm_response(content)
+
+        # Ensure required keys exist
+        result = {
+            "document_scope": data.get("document_scope", _DEFAULT_GUIDANCE["document_scope"]),
+            "code_groupings": data.get("code_groupings", []),
+            "selection_rules": data.get("selection_rules", []),
+        }
+        logger.info("Schedule guidance generated successfully")
+        return result
+
+    except Exception as e:
+        logger.error(f"Schedule guidance generation failed: {e}")
+        return dict(_DEFAULT_GUIDANCE)
+
+
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -482,6 +574,14 @@ def ingest_schedule(
     dedup = {row["code"]: row for row in code_rows}
     code_rows = list(dedup.values())
 
+    # Step 3b: Generate schedule guidance (second LLM call)
+    schedule_guidance = _generate_schedule_guidance(
+        full_text=full_text,
+        code_rows=code_rows,
+        profile=profile,
+        model=llm_model,
+    )
+
     # Step 4 & 5: Store in database
     db_path = schedule_dir / f"{schedule_id}.sqlite3"
     conn = _init_db(db_path)
@@ -554,6 +654,7 @@ def ingest_schedule(
         "codes_parsed": len(code_rows),
         "chunks_indexed": indexed_chunks,
         "profile": asdict(profile),
+        "schedule_guidance": schedule_guidance,
         "artifacts": {
             "text_pages": str(text_output),
             "codes": str(parsed_json),

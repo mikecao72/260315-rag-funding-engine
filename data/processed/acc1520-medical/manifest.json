@@ -1,6 +1,6 @@
 {
   "schedule_id": "acc1520-medical",
-  "source": "/home/pi/clawd/projects/rag-funding-engine/data/raw/ACC1520-Med-pract-nurse-pract-and-nurses-costs-v2.pdf",
+  "source": "C:\\Repositories\\260315-rag-funding-engine\\data\\raw\\ACC1520-Med-pract-nurse-pract-and-nurses-costs-v2.pdf",
   "source_hash": "85cf1f71bf63e260407c052d7f76cdbe48a4e48a4c64245eb6fe7b42944a0cfd",
   "pages": 11,
   "codes_parsed": 73,
@@ -10,7 +10,7 @@
     "description": "Medical practitioner, nurse, nurse practitioner and paramedic costs",
     "key_dimensions": [
       "age",
-      "community_services_card",
+      "card_holder_status",
       "treatment_type"
     ],
     "unique_rules": [
@@ -28,9 +28,35 @@
     "mileage_reimbursable": true,
     "after_hours_premium": false
   },
+  "schedule_guidance": {
+    "document_scope": {
+      "in_scope": "This schedule covers the costs associated with medical practitioner, nurse, nurse practitioner, and paramedic consultations and treatments as regulated by ACC. It includes specific codes for consultations based on age and Community Services Card (CSC) status, as well as codes for various medical procedures and treatments.",
+      "out_of_scope": "This schedule does not cover costs for non-medical services, treatments not listed, or any services outside the ACC regulations. It also does not include after-hours premiums or location-based adjustments beyond mileage reimbursement."
+    },
+    "code_groupings": [
+      {
+        "codes": "NCON, NC14, NCCS, NCCD, NUP1, NU14, NUCS, NUCD, GPN, GN14, GNCS, GNCD, NN1, NN14, NNCS, NNCD, PM1, PM14, PMCS, PMCD, GP1, GP14, GPCS, GPCD",
+        "category": "Consultation Codes",
+        "description": "Use these codes for consultations based on the provider type (nurse, nurse practitioner, paramedic, GP), age of the client (under or over 14), and whether the client holds a Community Services Card or is a dependant of a cardholder."
+      },
+      {
+        "codes": "MB1, MB2, MB3, MB4, MB5, MD1, MD2, MD3, MD4, MD5, MF1, MF2, MF3, MF4, MF5, MF6, MF7, MF8, MF9, MF10, MF11, MF12, MF13, MF14, MF15, MF16, ME1, MM1, MM2, MM3, MM4, MM5, MM6, MM7, MM8, MW1, MW2, MW3, MW4, MT1, MT2, MT3, MT4, MT5, EAR1, RN10",
+        "category": "Procedure/Treatment Codes",
+        "description": "Use these codes for specific medical procedures and treatments. Selection depends on the type of injury or condition, size/severity, and specific treatment requirements."
+      }
+    ],
+    "selection_rules": [
+      "Select consultation codes based on the provider type, age of the client, and CSC status. For example, use 'NCON' for a nurse consultation if the client is 14 years old or over.",
+      "Procedure codes should accompany consultation codes when a specific treatment or procedure is performed during the consultation.",
+      "Consultation codes are mutually exclusive; select only one consultation code per visit based on the criteria.",
+      "For burn and abrasion treatments, select the code based on the size of the affected area (e.g., 'MB1' for burns less than 4cm\u00b2).",
+      "For fracture treatments, select the code based on the specific bone and treatment method (e.g., 'MF1' for fractured finger or toe with closed reduction).",
+      "Ensure that procedure codes reflect the severity and complexity of the treatment, such as using 'MD5' for dislocation of the patella requiring cast immobilisation."
+    ]
+  },
   "artifacts": {
-    "text_pages": "/home/pi/clawd/projects/rag-funding-engine/data/processed/acc1520-medical/acc1520-medical_text_pages.json",
-    "codes": "/home/pi/clawd/projects/rag-funding-engine/data/processed/acc1520-medical/acc1520-medical_codes.json",
-    "db": "/home/pi/clawd/projects/rag-funding-engine/data/processed/acc1520-medical/acc1520-medical.sqlite3"
+    "text_pages": "C:\\Repositories\\260315-rag-funding-engine\\data\\processed\\acc1520-medical\\acc1520-medical_text_pages.json",
+    "codes": "C:\\Repositories\\260315-rag-funding-engine\\data\\processed\\acc1520-medical\\acc1520-medical_codes.json",
+    "db": "C:\\Repositories\\260315-rag-funding-engine\\data\\processed\\acc1520-medical\\acc1520-medical.sqlite3"
   }
 }

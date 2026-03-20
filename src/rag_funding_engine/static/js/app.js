@@ -17,6 +17,7 @@
             btn.classList.add("active");
             document.getElementById(btn.dataset.tab).classList.add("active");
             if (btn.dataset.tab === "schedules") loadSchedules();
+            if (btn.dataset.tab === "db-inspector") loadDbSchedules();
         });
     });
 
@@ -25,6 +26,13 @@
     var topNValue = document.getElementById("top-n-value");
     topNSlider.addEventListener("input", function () {
         topNValue.textContent = topNSlider.value;
+    });
+
+    // ── Min Confidence slider ──
+    var confidenceSlider = document.getElementById("min-confidence");
+    var confidenceValue = document.getElementById("confidence-value");
+    confidenceSlider.addEventListener("input", function () {
+        confidenceValue.textContent = parseFloat(confidenceSlider.value).toFixed(1);
     });
 
     // ── Load schedules ──
@@ -96,7 +104,8 @@
                 consult_text: consultText,
                 schedule_id: scheduleId,
                 top_n: parseInt(topNSlider.value, 10),
-                gst_mode: document.getElementById("gst-mode").value
+                gst_mode: document.getElementById("gst-mode").value,
+                min_confidence: parseFloat(confidenceSlider.value)
             })
         })
         .then(function (r) { return r.json(); })
@@ -248,6 +257,190 @@
                 document.getElementById("ingest-results").innerHTML =
                     '<div class="error-msg">Upload failed: ' + esc(err.message) + '</div>';
             });
+    });
+
+    // ── DB Inspector ──
+    var dbScheduleSelect = document.getElementById("db-schedule-select");
+    var dbTableList = document.getElementById("db-table-list");
+    var dbState = { scheduleId: "", tables: [], activeTable: "", offset: 0, pageSize: 50, total: 0 };
+
+    function loadDbSchedules() {
+        fetch("/schedules")
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var schedules = data.schedules || [];
+                dbScheduleSelect.innerHTML = "";
+                if (schedules.length === 0) {
+                    dbScheduleSelect.innerHTML = '<option value="">No schedules</option>';
+                    return;
+                }
+                schedules.forEach(function (s) {
+                    var opt = document.createElement("option");
+                    opt.value = s.schedule_id;
+                    opt.textContent = s.schedule_id;
+                    dbScheduleSelect.appendChild(opt);
+                });
+                if (schedules.length > 0) {
+                    dbState.scheduleId = schedules[0].schedule_id;
+                    loadDbTables();
+                }
+            })
+            .catch(function () {});
+    }
+
+    dbScheduleSelect.addEventListener("change", function () {
+        dbState.scheduleId = dbScheduleSelect.value;
+        dbState.activeTable = "";
+        resetDbMain();
+        loadDbTables();
+    });
+
+    function loadDbTables() {
+        if (!dbState.scheduleId) return;
+        dbTableList.innerHTML = '<div style="color:#71717a;font-size:0.8rem;padding:0.5rem 0">Loading...</div>';
+        fetch("/db/" + encodeURIComponent(dbState.scheduleId) + "/tables")
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) {
+                    dbTableList.innerHTML = '<div class="error-msg">' + esc(data.error) + '</div>';
+                    return;
+                }
+                dbState.tables = data.tables || [];
+                renderDbTableList();
+            })
+            .catch(function (err) {
+                dbTableList.innerHTML = '<div class="error-msg">' + esc(err.message) + '</div>';
+            });
+    }
+
+    function renderDbTableList() {
+        if (dbState.tables.length === 0) {
+            dbTableList.innerHTML = '<div class="empty-state" style="padding:1rem 0">No tables found.</div>';
+            return;
+        }
+        var html = "";
+        dbState.tables.forEach(function (t) {
+            var cls = t.name === dbState.activeTable ? "db-table-btn active" : "db-table-btn";
+            html += '<button type="button" class="' + cls + '" data-table="' + esc(t.name) + '">' +
+                '<span class="db-table-name">' + esc(t.name) + '</span>' +
+                '<span class="db-table-count">' + t.row_count + ' rows</span>' +
+                '</button>';
+        });
+        dbTableList.innerHTML = html;
+
+        dbTableList.querySelectorAll(".db-table-btn").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                dbState.activeTable = btn.dataset.table;
+                dbState.offset = 0;
+                renderDbTableList();
+                loadDbTableData();
+            });
+        });
+    }
+
+    function resetDbMain() {
+        document.getElementById("db-schema-section").style.display = "none";
+        document.getElementById("db-rows-section").style.display = "none";
+        document.getElementById("db-empty-state").style.display = "";
+        document.getElementById("db-table-label").textContent = "Select a table";
+        document.getElementById("db-table-title").textContent = "\u2014";
+        document.getElementById("db-row-count").textContent = "";
+    }
+
+    function loadDbTableData() {
+        var tableName = dbState.activeTable;
+        if (!tableName || !dbState.scheduleId) return;
+
+        // Find schema from cached tables
+        var tableInfo = null;
+        dbState.tables.forEach(function (t) { if (t.name === tableName) tableInfo = t; });
+        if (tableInfo) renderDbSchema(tableInfo);
+
+        // Fetch rows
+        var url = "/db/" + encodeURIComponent(dbState.scheduleId) +
+            "/tables/" + encodeURIComponent(tableName) +
+            "?limit=" + dbState.pageSize + "&offset=" + dbState.offset;
+
+        fetch(url)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) return;
+                dbState.total = data.total;
+                renderDbRows(data);
+            })
+            .catch(function () {});
+    }
+
+    function renderDbSchema(tableInfo) {
+        document.getElementById("db-empty-state").style.display = "none";
+        document.getElementById("db-schema-section").style.display = "";
+        document.getElementById("db-table-label").textContent = "Table";
+        document.getElementById("db-table-title").textContent = tableInfo.name;
+        document.getElementById("db-row-count").textContent = tableInfo.row_count + " total rows";
+
+        var body = document.getElementById("db-schema-body");
+        var html = "";
+        tableInfo.columns.forEach(function (col) {
+            html += '<tr>' +
+                '<td><strong>' + esc(col.name) + '</strong></td>' +
+                '<td><span class="db-type-badge">' + esc(col.type || "—") + '</span></td>' +
+                '<td>' + (col.pk ? '<span class="db-pk-badge">PK</span>' : '') + '</td>' +
+                '<td>' + (col.notnull ? 'Yes' : '') + '</td>' +
+                '</tr>';
+        });
+        body.innerHTML = html;
+    }
+
+    function renderDbRows(data) {
+        document.getElementById("db-rows-section").style.display = "";
+        var columns = data.columns || [];
+        var rows = data.rows || [];
+
+        // Header
+        var headHtml = '<tr>';
+        columns.forEach(function (col) {
+            headHtml += '<th>' + esc(col) + '</th>';
+        });
+        headHtml += '</tr>';
+        document.getElementById("db-rows-head").innerHTML = headHtml;
+
+        // Body
+        var bodyHtml = "";
+        if (rows.length === 0) {
+            bodyHtml = '<tr><td colspan="' + columns.length + '" class="empty-cell">No rows.</td></tr>';
+        } else {
+            rows.forEach(function (row) {
+                bodyHtml += '<tr>';
+                columns.forEach(function (col) {
+                    var val = row[col];
+                    var display = val == null ? '<span style="color:#52525b">NULL</span>' : esc(String(val));
+                    bodyHtml += '<td title="' + esc(String(val != null ? val : "")) + '">' + display + '</td>';
+                });
+                bodyHtml += '</tr>';
+            });
+        }
+        document.getElementById("db-rows-body").innerHTML = bodyHtml;
+
+        // Pagination
+        var total = data.total;
+        var start = data.offset + 1;
+        var end = Math.min(data.offset + data.rows.length, total);
+        document.getElementById("db-page-info").textContent = start + "–" + end + " of " + total;
+
+        var prevBtn = document.getElementById("db-prev-btn");
+        var nextBtn = document.getElementById("db-next-btn");
+        prevBtn.disabled = data.offset === 0;
+        nextBtn.disabled = (data.offset + dbState.pageSize) >= total;
+    }
+
+    document.getElementById("db-prev-btn").addEventListener("click", function () {
+        dbState.offset = Math.max(0, dbState.offset - dbState.pageSize);
+        loadDbTableData();
+    });
+
+    document.getElementById("db-next-btn").addEventListener("click", function () {
+        dbState.offset += dbState.pageSize;
+        loadDbTableData();
     });
 
     // ── Helpers ──
