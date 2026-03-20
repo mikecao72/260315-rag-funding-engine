@@ -114,6 +114,18 @@ class JobLogger:
         """Seconds since job started."""
         return round(time.monotonic() - self._start_time, 2)
 
+    def save_job_data(self, input_data: dict[str, Any], response: dict[str, Any]):
+        """Save the job input and output as job.json for later review."""
+        job_data = {
+            "job_id": self.job_id,
+            "timestamp": self._timestamp.isoformat(),
+            "duration_seconds": self.elapsed(),
+            "input": input_data,
+            "output": response,
+        }
+        data_path = self._job_dir / "job.json"
+        data_path.write_text(json.dumps(job_data, indent=2, ensure_ascii=False, default=str))
+
     def finish(self):
         """Write the footer and close the log file."""
         self._write("")

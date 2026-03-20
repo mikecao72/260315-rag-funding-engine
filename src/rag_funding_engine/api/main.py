@@ -240,10 +240,101 @@ def db_table_rows(schedule_id: str, table_name: str, limit: int = 100, offset: i
     }
 
 
+LOGS_DIR = ROOT / "logs"
+
+
+@app.get("/jobs")
+def list_jobs() -> dict:
+    """List all jobs with metadata for the jobs review page."""
+    import json as _json
+
+    jobs = []
+    if not LOGS_DIR.exists():
+        return {"jobs": jobs}
+
+    for date_dir in sorted(LOGS_DIR.iterdir(), reverse=True):
+        if not date_dir.is_dir() or date_dir.name.startswith("."):
+            continue
+        for job_dir in sorted(date_dir.iterdir(), reverse=True):
+            if not job_dir.is_dir():
+                continue
+            job_json = job_dir / "job.json"
+            if not job_json.exists():
+                continue
+            try:
+                data = _json.loads(job_json.read_text(encoding="utf-8"))
+                inp = data.get("input", {})
+                out = data.get("output", {})
+                consult_text = inp.get("consult_text", "") or ""
+                recs = out.get("recommendations", [])
+                jobs.append({
+                    "job_id": data.get("job_id", job_dir.name),
+                    "timestamp": data.get("timestamp", ""),
+                    "duration_seconds": data.get("duration_seconds"),
+                    "schedule_id": inp.get("schedule_id", ""),
+                    "description": consult_text[:120] + ("..." if len(consult_text) > 120 else ""),
+                    "gst_mode": inp.get("gst_mode", ""),
+                    "min_confidence": inp.get("min_confidence"),
+                    "top_n": inp.get("top_n"),
+                    "num_recommendations": len(recs),
+                    "total_excl_gst": out.get("estimated_total_excl_gst"),
+                    "has_error": bool(out.get("error")),
+                })
+            except Exception:
+                continue
+
+    return {"jobs": jobs}
+
+
+@app.get("/jobs/{job_id}")
+def get_job(job_id: str) -> dict:
+    """Get full job data (input + output) for a specific job."""
+    import json as _json
+
+    if not LOGS_DIR.exists():
+        return {"error": "No jobs found"}
+
+    # Find job directory by scanning date folders
+    for date_dir in LOGS_DIR.iterdir():
+        if not date_dir.is_dir():
+            continue
+        job_dir = date_dir / job_id
+        if job_dir.exists():
+            job_json = job_dir / "job.json"
+            if job_json.exists():
+                return _json.loads(job_json.read_text(encoding="utf-8"))
+
+    return {"error": f"Job not found: {job_id}"}
+
+
+@app.get("/jobs/{job_id}/log")
+def get_job_log(job_id: str) -> dict:
+    """Get the raw audit log for a specific job."""
+    if not LOGS_DIR.exists():
+        return {"error": "No jobs found"}
+
+    for date_dir in LOGS_DIR.iterdir():
+        if not date_dir.is_dir():
+            continue
+        job_dir = date_dir / job_id
+        if job_dir.exists():
+            log_file = job_dir / "job.log"
+            if log_file.exists():
+                return {"job_id": job_id, "log": log_file.read_text(encoding="utf-8")}
+
+    return {"error": f"Job log not found: {job_id}"}
+
+
 @app.get("/")
 def index():
     """Serve the frontend."""
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/jobs-ui")
+def jobs_ui():
+    """Serve the jobs review page."""
+    return FileResponse(STATIC_DIR / "jobs.html")
 
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

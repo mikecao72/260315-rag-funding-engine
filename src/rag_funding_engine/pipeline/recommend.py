@@ -775,6 +775,17 @@ def recommend_codes(
         ["code", "description", "fee_excl", "multiplier", "line_total", "confidence"],
     )
     logger.log_json("Full JSON response", response, max_length=5000)
+
+    # Save job data for frontend review
+    input_data = {
+        "consult_text": consult_text,
+        "consult_template": consult_template,
+        "schedule_id": schedule_id,
+        "top_n": top_n,
+        "gst_mode": gst_mode,
+        "min_confidence": min_confidence,
+    }
+    logger.save_job_data(input_data, response)
     logger.finish()
 
     return response

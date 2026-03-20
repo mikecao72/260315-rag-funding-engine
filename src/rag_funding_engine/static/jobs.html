@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Funding Engine — Jobs</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/jobs.css">
+</head>
+<body>
+    <header>
+        <div class="header-title">
+            <h1>RAG Funding Engine</h1>
+            <p class="subtitle">Job Review</p>
+        </div>
+        <nav>
+            <a href="/" class="tab">Recommend</a>
+            <a href="/jobs-ui" class="tab active">Jobs</a>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Job List View -->
+        <div id="jobs-list-view">
+            <div class="panel">
+                <div class="panel-header-row">
+                    <div>
+                        <p class="panel-label">History</p>
+                        <h2 class="panel-title">Previous Jobs</h2>
+                    </div>
+                    <div class="jobs-controls">
+                        <input type="text" id="jobs-search" placeholder="Filter by description, schedule, job ID...">
+                        <select id="jobs-sort">
+                            <option value="newest">Newest first</option>
+                            <option value="oldest">Oldest first</option>
+                            <option value="schedule">Schedule</option>
+                            <option value="codes-desc">Most codes</option>
+                            <option value="total-desc">Highest total</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table id="jobs-table">
+                        <thead>
+                            <tr>
+                                <th class="col-id">Job ID</th>
+                                <th class="col-time">Date / Time</th>
+                                <th class="col-schedule">Schedule</th>
+                                <th class="col-desc">Description</th>
+                                <th class="col-codes">Codes</th>
+                                <th class="col-total">Total</th>
+                                <th class="col-dur">Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobs-body">
+                            <tr><td colspan="7" class="empty-cell">Loading jobs...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="jobs-empty" class="empty-state" style="display:none">
+                    No jobs found. Run a recommendation from the <a href="/">Recommend</a> page first.
+                </div>
+            </div>
+        </div>
+
+        <!-- Job Detail View (hidden until a job is selected) -->
+        <div id="job-detail-view" style="display:none">
+            <div class="job-detail-header">
+                <button type="button" id="back-btn" class="tab">&larr; Back to Jobs</button>
+                <div class="job-detail-meta">
+                    <span id="detail-job-id" class="job-id-badge"></span>
+                    <span id="detail-schedule" class="result-count"></span>
+                    <span id="detail-time" class="result-count"></span>
+                </div>
+            </div>
+
+            <!-- Sub-tabs -->
+            <div class="job-tabs">
+                <button class="tab active" data-job-tab="input-output">Input / Output</button>
+                <button class="tab" data-job-tab="audit-log">Audit Log</button>
+            </div>
+
+            <!-- Tab 1: Input / Output -->
+            <section id="input-output" class="job-tab-content active">
+                <div class="recommend-layout">
+                    <!-- Input Panel -->
+                    <div class="panel">
+                        <p class="panel-label">Input</p>
+                        <h2 class="panel-title">Transcript / SOAP Note</h2>
+                        <textarea id="detail-consult-text" rows="16" readonly></textarea>
+                        <div class="input-controls">
+                            <div class="controls-row">
+                                <div class="control-group">
+                                    <label>Schedule</label>
+                                    <input type="text" id="detail-schedule-id" readonly>
+                                </div>
+                                <div class="control-group">
+                                    <label>GST</label>
+                                    <input type="text" id="detail-gst-mode" readonly>
+                                </div>
+                                <div class="control-group">
+                                    <label>Top N</label>
+                                    <input type="text" id="detail-top-n" readonly>
+                                </div>
+                                <div class="control-group">
+                                    <label>Min Confidence</label>
+                                    <input type="text" id="detail-min-conf" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Output Panel -->
+                    <div class="panel">
+                        <div class="panel-header-row">
+                            <p class="panel-label">Output</p>
+                            <span id="detail-result-count" class="result-count"></span>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table id="detail-results-table">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Unit Price (excl GST)</th>
+                                        <th>Qty</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detail-results-body">
+                                    <tr><td colspan="4" class="empty-cell">—</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="grand-total-row">
+                            <div id="detail-grand-total" class="grand-total">
+                                Grand Total: <span class="grand-total-amount">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 2: Audit Log -->
+            <section id="audit-log" class="job-tab-content">
+                <div class="panel">
+                    <p class="panel-label">Audit</p>
+                    <h2 class="panel-title">Pipeline Log</h2>
+                    <pre id="audit-log-content" class="audit-log-pre">Loading...</pre>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="/static/js/jobs.js"></script>
+</body>
+</html>

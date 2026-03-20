@@ -1,0 +1,156 @@
+/* ── Jobs page ── */
+
+/* Navigation links styled as tabs */
+header nav a.tab {
+    text-decoration: none;
+}
+
+/* Search and sort controls */
+.jobs-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.jobs-controls input[type="text"] {
+    width: 280px;
+}
+
+.jobs-controls select {
+    min-width: 140px;
+}
+
+/* Jobs table column widths */
+#jobs-table { table-layout: auto; }
+
+#jobs-table th.col-id { width: 14%; }
+#jobs-table th.col-time { width: 14%; }
+#jobs-table th.col-schedule { width: 12%; }
+#jobs-table th.col-desc { width: 34%; }
+#jobs-table th.col-codes { width: 8%; text-align: center; }
+#jobs-table th.col-total { width: 10%; text-align: right; }
+#jobs-table th.col-dur { width: 8%; text-align: right; }
+
+#jobs-table td { font-size: 0.82rem; }
+
+.jobs-row {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.jobs-row:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.jobs-row td.col-codes { text-align: center; }
+.jobs-row td.col-total { text-align: right; }
+.jobs-row td.col-dur { text-align: right; }
+
+.jobs-row .job-desc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 350px;
+    display: block;
+}
+
+.jobs-row .job-id-text {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.78rem;
+    color: #a1a1aa;
+}
+
+.job-error-row {
+    color: #fca5a5;
+}
+
+/* ── Job detail view ── */
+.job-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.job-detail-meta {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.job-id-badge {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.82rem;
+    background: rgba(139, 92, 246, 0.15);
+    color: #c4b5fd;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+}
+
+/* Sub-tabs for job detail */
+.job-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.job-tab-content {
+    display: none;
+}
+
+.job-tab-content.active {
+    display: block;
+}
+
+/* Read-only inputs in detail view */
+#input-output input[readonly],
+#input-output textarea[readonly] {
+    opacity: 0.85;
+    cursor: default;
+}
+
+/* Audit log pre block */
+.audit-log-pre {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: #d4d4d8;
+    overflow: auto;
+    max-height: 80vh;
+    white-space: pre;
+    tab-size: 2;
+}
+
+/* Code button in detail results (reuse from main styles) */
+#detail-results-table .code-btn {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+    font-family: inherit;
+    width: 100%;
+}
+
+/* ── Mobile ── */
+@media (max-width: 800px) {
+    .jobs-controls {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .jobs-controls input[type="text"] {
+        width: 100%;
+    }
+
+    .job-detail-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
