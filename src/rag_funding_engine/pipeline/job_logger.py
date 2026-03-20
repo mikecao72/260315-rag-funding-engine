@@ -124,7 +124,7 @@ class JobLogger:
             "output": response,
         }
         data_path = self._job_dir / "job.json"
-        data_path.write_text(json.dumps(job_data, indent=2, ensure_ascii=False, default=str))
+        data_path.write_text(json.dumps(job_data, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
 
     def finish(self):
         """Write the footer and close the log file."""
