@@ -101,6 +101,8 @@ The final JSON response includes:
 | `estimated_total_incl_gst` | Sum of all incl-GST line totals |
 | `evidence_chunks[]` | Top 3 supporting policy text snippets with page and similarity score |
 | `notes` | System-level annotations |
+| `job_id` | Unique job identifier (YYMMDD-HHMMSS format) |
+| `job_log` | Filesystem path to the full pipeline audit log |
 
 ### Multi-Schedule Isolation
 
@@ -108,9 +110,11 @@ Each ingested schedule gets its own directory under `data/processed/{schedule_id
 
 ### Key Source Modules
 
-- `src/rag_funding_engine/api/main.py` — FastAPI app (port 8010): `/health`, `/ingest`, `/recommend`, `/schedules`, `/schedules/{id}`
+- `run.py` — Server launcher (`python run.py`). Adds `src/` to path automatically, works on Windows/Mac/Linux without `PYTHONPATH`
+- `src/rag_funding_engine/api/main.py` — FastAPI app (port 8010): `/health`, `/ingest`, `/recommend`, `/schedules`, `/schedules/{id}`, `/db/{id}/tables`, `/db/{id}/tables/{name}`, `/jobs`, `/jobs/{id}`, `/jobs/{id}/log`, `/jobs-ui`
 - `src/rag_funding_engine/pipeline/ingest_schedule.py` — PDF ingestion, LLM-based ScheduleProfile + schedule_guidance generation, code row parsing, chunking, embedding
-- `src/rag_funding_engine/pipeline/recommend.py` — LLM-based code selection (wide net) → reasoning model adjudication (narrowing) → pricing rules → evidence assembly
+- `src/rag_funding_engine/pipeline/recommend.py` — LLM-based code selection (wide net) → reasoning model adjudication (narrowing) → pricing rules → evidence assembly. Every step is logged via `JobLogger`.
+- `src/rag_funding_engine/pipeline/job_logger.py` — Per-job logging. Creates `logs/YYMMDD/YYMMDD-HHMMSS/` with `job.log` (human-readable pipeline trace) and `job.json` (full input + output for frontend review).
 - `src/rag_funding_engine/pipeline/semantic.py` — OpenAI embeddings (`text-embedding-3-small`, 1536-d) with deterministic hash fallback (128-d) for offline dev
 - `src/rag_funding_engine/pipeline/constraints.py` — Prototype constraint engine (may be deprecated — LLM handles dedup/gating now)
 - `src/rag_funding_engine/db/models.py` — SQLAlchemy ORM: `ScheduleVersion`, `ScheduleCode`, `BillingRule` tables
@@ -134,6 +138,22 @@ LLM-generated instructions stored in manifest.json under `schedule_guidance`. Ge
 - `document_scope`: What the schedule covers, its environment, and what is out of scope
 - `code_groupings`: Array of `{codes, category, description}` grouping related codes (e.g., nurse consultation codes, fracture codes)
 - `selection_rules`: Array of rules the code selector LLM must follow (e.g., "always select one consultation code", "select wound code based on length")
+
+### Job Logging
+
+Every recommendation run creates a job folder under `logs/YYMMDD/YYMMDD-HHMMSS/` containing:
+- `job.log` — Human-readable step-by-step trace: input, profile/guidance loaded, all DB codes, LLM prompts and raw responses, selected/dropped codes, pricing, evidence chunks, final output
+- `job.json` — Machine-readable snapshot of full input parameters and API response, used by the Jobs review page
+
+The `job_id` and `job_log` path are returned in the API response for traceability.
+
+### Frontend Pages
+
+- **`/`** (index.html) — Main app with tabs: Recommend, Schedules, Ingest, DB Inspector. Links to Jobs page.
+- **`/jobs-ui`** (jobs.html) — Standalone job review page:
+  - **Job list** — Filterable/sortable table of all past jobs (by date, schedule, description, code count, total)
+  - **Tab 1 (Input/Output)** — Replays the recommendation: consult text on the left, results table on the right (read-only, matching the Recommend layout)
+  - **Tab 2 (Audit Log)** — Full `job.log` rendered as preformatted text
 
 ## Environment Variables
 
